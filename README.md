@@ -13,3 +13,7 @@ Apache Airflow local invoking an Amazon Bedrock AgentCore Runtime to troubleshoo
 - ngrok or equivalent tunnel for local Airflow
 
 See [PLAN.MD](PLAN.MD) for the implementation plan.
+
+## Local Airflow Configuration
+
+Copy `airflow/.env.example` to `airflow/.env` and fill the `AIRFLOW_VAR_*` values. Airflow exposes those env vars as `{{ var.value.* }}`, so the AgentCore setup DAGs do not require manually creating Airflow Variables in the UI.
