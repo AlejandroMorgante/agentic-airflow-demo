@@ -1,7 +1,8 @@
 from agent import troubleshoot
 
 
-def test_deterministic_troubleshoot_returns_summary():
+def test_deterministic_troubleshoot_returns_summary(monkeypatch):
+    monkeypatch.setenv("AGENT_USE_MOCKS", "true")
     result = troubleshoot({"dag_id": "demo_failing_etl", "run_id": "manual__test"})
 
     assert result["task_id"] == "transform"

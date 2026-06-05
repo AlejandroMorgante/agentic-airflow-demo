@@ -84,6 +84,13 @@ def _deterministic_troubleshoot(dag_id: str, run_id: str) -> dict[str, Any]:
     failed_tasks = fetch_failed_tasks(dag_id, run_id)
     if not failed_tasks:
         return {"summary": "No failed tasks found", "dag_id": dag_id, "run_id": run_id}
+    if failed_tasks[0].get("error"):
+        return {
+            "summary": "Failed to query Airflow for failed tasks",
+            "dag_id": dag_id,
+            "run_id": run_id,
+            "error": failed_tasks[0]["error"],
+        }
 
     task = failed_tasks[0]
     task_id = task["task_id"]
