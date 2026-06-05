@@ -1,3 +1,5 @@
+import pytest
+
 from agent import troubleshoot
 
 
@@ -9,3 +11,10 @@ def test_deterministic_troubleshoot_returns_summary(monkeypatch):
     assert "KeyError" in result["summary"]
     assert "data['rowz']" in result["likely_cause"]
     assert result["slack"]["ok"] is True
+
+
+def test_deterministic_troubleshoot_rejects_real_data_without_model(monkeypatch):
+    monkeypatch.delenv("AGENT_USE_MOCKS", raising=False)
+
+    with pytest.raises(RuntimeError, match="AGENT_USE_MOCKS=true"):
+        troubleshoot({"dag_id": "demo_failing_etl", "run_id": "manual__test"})

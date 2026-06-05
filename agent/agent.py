@@ -81,6 +81,13 @@ if USE_MODEL:
 
 
 def _deterministic_troubleshoot(dag_id: str, run_id: str) -> dict[str, Any]:
+    use_mocks = os.environ.get("AGENT_USE_MOCKS", "false").lower() in {"1", "true", "yes"}
+    if not use_mocks:
+        raise RuntimeError(
+            "Deterministic troubleshooting is only valid with AGENT_USE_MOCKS=true. "
+            "Set AGENT_USE_MODEL=true to analyze real Airflow/GitHub data."
+        )
+
     failed_tasks = fetch_failed_tasks(dag_id, run_id)
     if not failed_tasks:
         return {"summary": "No failed tasks found", "dag_id": dag_id, "run_id": run_id}
