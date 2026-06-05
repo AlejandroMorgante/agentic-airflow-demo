@@ -4,12 +4,20 @@ import json
 
 import pendulum
 from airflow.providers.amazon.aws.operators.bedrock import BedrockInvokeAgentRuntimeOperator
-from airflow.sdk import DAG, task
+from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.sdk import DAG
 
 try:
     from airflow.sdk import TriggerRule
 except ImportError:
     from airflow.utils.trigger_rule import TriggerRule
+
+
+def fail_transform() -> dict:
+    data = {"rows": 100, "source": "demo"}
+    # Intentional demo failure: extract emits "rows", not "rowz".
+    return {"transformed": data["rowz"]}
 
 
 with DAG(
@@ -19,19 +27,9 @@ with DAG(
     catchup=False,
     tags=["agentic-airflow", "demo"],
 ):
-
-    @task
-    def extract() -> dict:
-        return {"rows": 100, "source": "demo"}
-
-    @task
-    def transform(data: dict) -> dict:
-        # Intentional demo failure: extract emits "rows", not "rowz".
-        return {"transformed": data["rowz"]}
-
-    @task
-    def load(data: dict) -> str:
-        return f"loaded {data['transformed']}"
+    extract = EmptyOperator(task_id="extract")
+    transform = PythonOperator(task_id="transform", python_callable=fail_transform)
+    load = EmptyOperator(task_id="load")
 
     troubleshoot = BedrockInvokeAgentRuntimeOperator(
         task_id="troubleshoot_with_agent",
@@ -46,8 +44,5 @@ with DAG(
         trigger_rule=TriggerRule.ONE_FAILED,
     )
 
-    raw = extract()
-    transformed = transform(raw)
-    loaded = load(transformed)
-
-    [raw, transformed, loaded] >> troubleshoot
+    extract >> transform >> load
+    [extract, transform, load] >> troubleshoot
