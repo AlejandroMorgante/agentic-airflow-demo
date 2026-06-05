@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.DS_Store
+logs/
+*.log
+.idea/
+.vscode/
+airflow/logs/
+airflow/plugins/
+airflow/config/
+airflow/.env
+agent/.venv/
+.pytest_cache/
