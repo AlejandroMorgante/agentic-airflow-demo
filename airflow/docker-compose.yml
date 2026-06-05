@@ -16,11 +16,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/simple_auth_manager_passwords.json
+    AWS_PROFILE: ${AWS_PROFILE:-snail-data}
+    AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    AWS_REGION: ${AWS_REGION:-us-east-1}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
     - ./config:/opt/airflow/config
+    - ${HOME}/.aws:/home/airflow/.aws:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
