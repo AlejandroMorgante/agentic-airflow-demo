@@ -25,13 +25,24 @@ def fail_transform() -> dict:
     return {"transformed": data["rowz"]}
 
 
-def _read_task_log(dag_id: str, run_id: str, task_id: str, try_number: int) -> str:
-    log_dir = (
+def _task_log_dir(dag_id: str, run_id: str, task_id: str) -> Path:
+    return (
         Path("/opt/airflow/logs")
         / f"dag_id={dag_id}"
         / f"run_id={run_id}"
         / f"task_id={task_id}"
     )
+
+
+def _latest_try_number(dag_id: str, run_id: str, task_id: str) -> int:
+    attempts = sorted(_task_log_dir(dag_id, run_id, task_id).glob("attempt=*.log"))
+    if not attempts:
+        return 1
+    return int(attempts[-1].stem.split("=", 1)[1])
+
+
+def _read_task_log(dag_id: str, run_id: str, task_id: str, try_number: int) -> str:
+    log_dir = _task_log_dir(dag_id, run_id, task_id)
     attempt_path = log_dir / f"attempt={try_number}.log"
     if not attempt_path.exists():
         attempts = sorted(log_dir.glob("attempt=*.log"))
@@ -52,8 +63,7 @@ def collect_failure_context(**context: Any) -> str:
     dag_id = context["dag"].dag_id
     run_id = dag_run.run_id
     task_id = "transform"
-    failed_ti = dag_run.get_task_instance(task_id)
-    try_number = int(getattr(failed_ti, "try_number", 1) or 1)
+    try_number = _latest_try_number(dag_id, run_id, task_id)
 
     payload = {
         "dag_id": dag_id,
@@ -61,7 +71,7 @@ def collect_failure_context(**context: Any) -> str:
         "dag_file": "demo_failing_etl.py",
         "failed_task": {
             "task_id": task_id,
-            "state": getattr(failed_ti, "state", "failed"),
+            "state": "failed",
             "try_number": try_number,
         },
         "log_excerpt": _read_task_log(dag_id, run_id, task_id, try_number),
