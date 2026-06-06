@@ -99,7 +99,7 @@ def _deterministic_troubleshoot(dag_id: str, run_id: str) -> dict[str, Any]:
     pr_result = create_github_pr(
         filename=filename,
         fixed_content=fixed_content,
-        pr_title=f"fix({dag_id}): correct key 'rowz' → 'rows' in transform",
+        pr_title=f"fix({dag_id}): correct key 'rowz' to 'rows' in transform",
         pr_body=(
             f"## Agent-suggested fix\n\n"
             f"**DAG:** `{dag_id}`  \n"
@@ -139,7 +139,8 @@ def _payload_prompt(payload: dict[str, Any]) -> str:
         "Troubleshoot this Airflow failure using the JSON payload below. "
         "The payload already contains the failed task and log excerpt from Airflow. "
         "Read the DAG source from GitHub, analyze the logs and source together, "
-        "then post a clear explanation with a suggested fix to Slack.\n\n"
+        "open a draft GitHub PR with the corrected DAG, then post a clear "
+        "explanation with the PR link to Slack.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
     )
 

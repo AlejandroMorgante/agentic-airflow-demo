@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import base64
+import ast
+import hashlib
 import logging
 import os
-import time
+import re
 from typing import Any
 from urllib.parse import quote
 
@@ -13,6 +15,8 @@ from tools.strands_compat import tool
 log = logging.getLogger(__name__)
 
 SOURCE_HEAD_CHARS = 6000
+DEFAULT_DAG_PATH = "airflow/dags"
+MAX_FIXED_CONTENT_CHARS = 100_000
 
 
 def _use_mocks() -> bool:
@@ -51,7 +55,7 @@ def _github_headers() -> dict[str, str]:
 def _mock_create_github_pr(filename: str, fixed_content: str, pr_title: str, pr_body: str) -> dict[str, Any]:
     log.info("Mock create_github_pr filename=%s", filename)
     return {
-        "pr_url": "https://github.com/AlejandroMorgante/poc_agentic_airflow/pull/1",
+        "pr_url": "https://github.com/owner/repo/pull/1",
         "pr_number": 1,
         "branch": "agent/fix-mock",
         "mock": True,
@@ -59,10 +63,44 @@ def _mock_create_github_pr(filename: str, fixed_content: str, pr_title: str, pr_
 
 
 def _content_path(filename: str) -> str:
+    prefix = os.environ.get("GITHUB_DAG_PATH", DEFAULT_DAG_PATH).strip("/")
+    cleaned = filename.strip().lstrip("/")
+    if not cleaned or cleaned.endswith("/"):
+        raise ValueError("filename must point to a DAG file")
+    if ".." in cleaned.split("/"):
+        raise ValueError("filename must not contain parent directory segments")
     if "/" in filename:
-        return filename.lstrip("/")
-    prefix = os.environ.get("GITHUB_DAG_PATH", "airflow/dags").strip("/")
-    return f"{prefix}/{filename}"
+        if cleaned != prefix and not cleaned.startswith(f"{prefix}/"):
+            raise ValueError(f"filename must be under {prefix}")
+        return cleaned
+    return f"{prefix}/{cleaned}"
+
+
+def _validate_dag_update(path: str, fixed_content: str) -> None:
+    if not path.endswith(".py"):
+        raise ValueError("create_github_pr can only update Python DAG files")
+    max_chars = int(os.environ.get("GITHUB_MAX_FIXED_CONTENT_CHARS", str(MAX_FIXED_CONTENT_CHARS)))
+    if len(fixed_content) > max_chars:
+        raise ValueError(f"fixed_content is too large; max is {max_chars} characters")
+    ast.parse(fixed_content, filename=path)
+
+
+def _branch_name(filename: str, fixed_content: str) -> str:
+    stem = filename.removesuffix(".py").strip().strip("/")
+    stem = re.sub(r"[^A-Za-z0-9._/-]+", "-", stem)
+    stem = stem.replace("/", "-").strip("-") or "dag"
+    digest = hashlib.sha256(fixed_content.encode()).hexdigest()[:12]
+    return f"agent/fix-{stem}-{digest}"
+
+
+def _delete_branch(base_url: str, headers: dict[str, str], branch_name: str) -> None:
+    resp = requests.delete(
+        f"{base_url}/git/refs/heads/{quote(branch_name, safe='/')}",
+        headers=headers,
+        timeout=15,
+    )
+    if resp.status_code not in {204, 404}:
+        resp.raise_for_status()
 
 
 @tool
@@ -120,21 +158,33 @@ def create_github_pr(
         repo = os.environ["GITHUB_REPO"]
         ref = os.environ.get("GITHUB_REF", "main")
         path = _content_path(filename)
+        _validate_dag_update(path, fixed_content)
         encoded_path = quote(path, safe="/")
         base_url = f"https://api.github.com/repos/{repo}"
         headers = _github_headers()
+        owner = repo.split("/", 1)[0]
+        branch_name = _branch_name(filename, fixed_content)
+        branch_created = False
 
-        # 1. Get current file SHA (needed for the update PUT)
-        file_resp = requests.get(
-            f"{base_url}/contents/{encoded_path}",
+        # Return the existing draft/open PR for the same generated fix instead of spamming retries.
+        existing_prs_resp = requests.get(
+            f"{base_url}/pulls",
             headers=headers,
-            params={"ref": ref},
+            params={"state": "open", "head": f"{owner}:{branch_name}", "base": ref},
             timeout=15,
         )
-        file_resp.raise_for_status()
-        file_sha = file_resp.json()["sha"]
+        existing_prs_resp.raise_for_status()
+        existing_prs = existing_prs_resp.json()
+        if existing_prs:
+            pr_data = existing_prs[0]
+            return {
+                "pr_url": pr_data["html_url"],
+                "pr_number": pr_data["number"],
+                "branch": branch_name,
+                "existing": True,
+            }
 
-        # 2. Get base branch HEAD commit SHA (needed to create the new branch)
+        # 1. Get base branch HEAD commit SHA (needed to create the new branch)
         ref_resp = requests.get(
             f"{base_url}/git/ref/heads/{ref}",
             headers=headers,
@@ -143,14 +193,28 @@ def create_github_pr(
         ref_resp.raise_for_status()
         head_sha = ref_resp.json()["object"]["sha"]
 
-        # 3. Create fix branch
-        branch_name = f"agent/fix-{filename.removesuffix('.py')}-{int(time.time())}"
-        requests.post(
+        # 2. Create fix branch. A 422 means an earlier retry already created it.
+        create_branch_resp = requests.post(
             f"{base_url}/git/refs",
             headers=headers,
             json={"ref": f"refs/heads/{branch_name}", "sha": head_sha},
             timeout=15,
-        ).raise_for_status()
+        )
+        if create_branch_resp.status_code == 422:
+            log.info("GitHub branch already exists: %s", branch_name)
+        else:
+            create_branch_resp.raise_for_status()
+            branch_created = True
+
+        # 3. Get current file SHA on the fix branch (needed for the update PUT)
+        file_resp = requests.get(
+            f"{base_url}/contents/{encoded_path}",
+            headers=headers,
+            params={"ref": branch_name},
+            timeout=15,
+        )
+        file_resp.raise_for_status()
+        file_sha = file_resp.json()["sha"]
 
         # 4. Commit the fixed file onto the new branch
         requests.put(
@@ -188,4 +252,9 @@ def create_github_pr(
         }
     except Exception as exc:
         log.exception("Failed to create GitHub PR")
+        if "base_url" in locals() and "headers" in locals() and branch_created:
+            try:
+                _delete_branch(base_url, headers, branch_name)
+            except Exception:
+                log.exception("Failed to clean up GitHub branch %s", branch_name)
         return {"error": str(exc)}

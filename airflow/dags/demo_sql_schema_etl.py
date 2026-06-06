@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
 import pendulum
@@ -15,26 +16,41 @@ except ImportError:
     from airflow.utils.trigger_rule import TriggerRule
 
 
-def fail_transform() -> dict:
-    data = {"rows": 100, "source": "demo"}
-    # Intentional demo failure: extract emits "rows", not "rowz".
-    return {"transformed": data["rowz"]}
+def build_customer_report() -> list[tuple[Any, ...]]:
+    connection = sqlite3.connect(":memory:")
+    connection.execute(
+        "create table orders (order_id text, customer_id text, amount real)"
+    )
+    connection.executemany(
+        "insert into orders values (?, ?, ?)",
+        [
+            ("A-100", "C-001", 19.95),
+            ("A-101", "C-002", 24.50),
+        ],
+    )
+    return connection.execute(
+        """
+        select customer_id, customer_tier, sum(amount) as total_amount
+        from orders
+        group by customer_id, customer_tier
+        """
+    ).fetchall()
 
 
 def collect_failure_context(**context: Any) -> str:
-    return collect_failure_context_payload("demo_failing_etl.py", "transform", **context)
+    return collect_failure_context_payload("demo_sql_schema_etl.py", "build_customer_report", **context)
 
 
 with DAG(
-    dag_id="demo_failing_etl",
+    dag_id="demo_sql_schema_etl",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    tags=["agentic-airflow", "demo"],
+    tags=["agentic-airflow", "demo", "sql"],
 ):
-    extract = EmptyOperator(task_id="extract")
-    transform = PythonOperator(task_id="transform", python_callable=fail_transform)
-    load = EmptyOperator(task_id="load")
+    stage_orders = EmptyOperator(task_id="stage_orders")
+    report = PythonOperator(task_id="build_customer_report", python_callable=build_customer_report)
+    publish = EmptyOperator(task_id="publish_report")
 
     failure_context = PythonOperator(
         task_id="collect_failure_context",
@@ -49,5 +65,5 @@ with DAG(
         botocore_config={"read_timeout": 300},
     )
 
-    extract >> transform >> load
-    [extract, transform, load] >> failure_context >> troubleshoot
+    stage_orders >> report >> publish
+    [stage_orders, report, publish] >> failure_context >> troubleshoot

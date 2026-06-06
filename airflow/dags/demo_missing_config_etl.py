@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pendulum
@@ -15,26 +16,25 @@ except ImportError:
     from airflow.utils.trigger_rule import TriggerRule
 
 
-def fail_transform() -> dict:
-    data = {"rows": 100, "source": "demo"}
-    # Intentional demo failure: extract emits "rows", not "rowz".
-    return {"transformed": data["rowz"]}
+def resolve_target_table() -> dict[str, str]:
+    schema = os.environ["WAREHOUSE_SCHEMA"]
+    return {"target_table": f"{schema}.daily_order_summary"}
 
 
 def collect_failure_context(**context: Any) -> str:
-    return collect_failure_context_payload("demo_failing_etl.py", "transform", **context)
+    return collect_failure_context_payload("demo_missing_config_etl.py", "resolve_target_table", **context)
 
 
 with DAG(
-    dag_id="demo_failing_etl",
+    dag_id="demo_missing_config_etl",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    tags=["agentic-airflow", "demo"],
+    tags=["agentic-airflow", "demo", "config"],
 ):
-    extract = EmptyOperator(task_id="extract")
-    transform = PythonOperator(task_id="transform", python_callable=fail_transform)
-    load = EmptyOperator(task_id="load")
+    start = EmptyOperator(task_id="start")
+    resolve_config = PythonOperator(task_id="resolve_target_table", python_callable=resolve_target_table)
+    load_summary = EmptyOperator(task_id="load_summary")
 
     failure_context = PythonOperator(
         task_id="collect_failure_context",
@@ -49,5 +49,5 @@ with DAG(
         botocore_config={"read_timeout": 300},
     )
 
-    extract >> transform >> load
-    [extract, transform, load] >> failure_context >> troubleshoot
+    start >> resolve_config >> load_summary
+    [start, resolve_config, load_summary] >> failure_context >> troubleshoot

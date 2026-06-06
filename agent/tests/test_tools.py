@@ -4,13 +4,14 @@ from tools.slack import post_to_slack
 
 
 class _FakeJsonResponse:
-    text = "log body"
-    status_code = 200
-
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self._payload = payload
+        self.status_code = status_code
+        self.text = "log body"
 
     def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
         return None
 
     def json(self):
@@ -115,3 +116,143 @@ def test_github_source_uses_prefix_and_ref(monkeypatch):
     assert source == "print('ok')\n"
     assert calls[0][0].endswith("/repos/owner/repo/contents/airflow/dags/demo_failing_etl.py")
     assert calls[0][1]["params"] == {"ref": "feature/demo"}
+
+
+def test_github_source_rejects_paths_outside_dag_prefix(monkeypatch):
+    monkeypatch.delenv("AGENT_USE_MOCKS", raising=False)
+    monkeypatch.setenv("GITHUB_REPO", "owner/repo")
+    monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
+
+    source = fetch_dag_source(".github/workflows/deploy.yml")
+
+    assert source.startswith("ERROR fetching DAG source")
+    assert "filename must be under airflow/dags" in source
+
+
+def test_create_github_pr_uses_draft_pr_and_deterministic_branch(monkeypatch):
+    get_calls = []
+    post_calls = []
+    put_calls = []
+    fixed_content = "print('fixed')\n"
+
+    def fake_get(url, **kwargs):
+        get_calls.append((url, kwargs))
+        if url.endswith("/pulls"):
+            return _FakeJsonResponse([])
+        if url.endswith("/git/ref/heads/main"):
+            return _FakeJsonResponse({"object": {"sha": "base-sha"}})
+        if "/contents/airflow/dags/demo_failing_etl.py" in url:
+            return _FakeJsonResponse({"sha": "file-sha"})
+        raise AssertionError(f"unexpected GET {url}")
+
+    def fake_post(url, **kwargs):
+        post_calls.append((url, kwargs))
+        if url.endswith("/git/refs"):
+            return _FakeJsonResponse({"ref": kwargs["json"]["ref"]})
+        if url.endswith("/pulls"):
+            return _FakeJsonResponse({"html_url": "https://github.com/owner/repo/pull/42", "number": 42})
+        raise AssertionError(f"unexpected POST {url}")
+
+    def fake_put(url, **kwargs):
+        put_calls.append((url, kwargs))
+        return _FakeJsonResponse({"content": {"sha": "new-sha"}})
+
+    monkeypatch.delenv("AGENT_USE_MOCKS", raising=False)
+    monkeypatch.setenv("GITHUB_REPO", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF", "main")
+    monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
+    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("tools.github_api.requests.post", fake_post)
+    monkeypatch.setattr("tools.github_api.requests.put", fake_put)
+
+    result = create_github_pr(
+        filename="demo_failing_etl.py",
+        fixed_content=fixed_content,
+        pr_title="fix(demo_failing_etl): correct key name",
+        pr_body="Root cause: wrong key.",
+    )
+
+    branch = result["branch"]
+    assert result["pr_url"] == "https://github.com/owner/repo/pull/42"
+    assert branch.startswith("agent/fix-demo_failing_etl-")
+    assert get_calls[0][1]["params"] == {"state": "open", "head": f"owner:{branch}", "base": "main"}
+    assert post_calls[0][1]["json"] == {"ref": f"refs/heads/{branch}", "sha": "base-sha"}
+    assert put_calls[0][1]["json"]["branch"] == branch
+    assert post_calls[1][1]["json"]["draft"] is True
+
+
+def test_create_github_pr_returns_existing_pr_without_new_branch(monkeypatch):
+    post_calls = []
+
+    def fake_get(url, **kwargs):
+        if url.endswith("/pulls"):
+            return _FakeJsonResponse([{"html_url": "https://github.com/owner/repo/pull/42", "number": 42}])
+        raise AssertionError(f"unexpected GET {url}")
+
+    def fake_post(url, **kwargs):
+        post_calls.append((url, kwargs))
+        return _FakeJsonResponse({})
+
+    monkeypatch.delenv("AGENT_USE_MOCKS", raising=False)
+    monkeypatch.setenv("GITHUB_REPO", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF", "main")
+    monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
+    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("tools.github_api.requests.post", fake_post)
+
+    result = create_github_pr(
+        filename="demo_failing_etl.py",
+        fixed_content="print('fixed')\n",
+        pr_title="fix(demo_failing_etl): correct key name",
+        pr_body="Root cause: wrong key.",
+    )
+
+    assert result["existing"] is True
+    assert result["pr_number"] == 42
+    assert post_calls == []
+
+
+def test_create_github_pr_cleans_created_branch_on_pr_failure(monkeypatch):
+    deleted = []
+
+    def fake_get(url, **kwargs):
+        if url.endswith("/pulls"):
+            return _FakeJsonResponse([])
+        if url.endswith("/git/ref/heads/main"):
+            return _FakeJsonResponse({"object": {"sha": "base-sha"}})
+        if "/contents/airflow/dags/demo_failing_etl.py" in url:
+            return _FakeJsonResponse({"sha": "file-sha"})
+        raise AssertionError(f"unexpected GET {url}")
+
+    def fake_post(url, **kwargs):
+        if url.endswith("/git/refs"):
+            return _FakeJsonResponse({"ref": kwargs["json"]["ref"]})
+        if url.endswith("/pulls"):
+            return _FakeJsonResponse({"message": "validation failed"}, status_code=422)
+        raise AssertionError(f"unexpected POST {url}")
+
+    def fake_put(url, **kwargs):
+        return _FakeJsonResponse({"content": {"sha": "new-sha"}})
+
+    def fake_delete(url, **kwargs):
+        deleted.append(url)
+        return _FakeJsonResponse({}, status_code=204)
+
+    monkeypatch.delenv("AGENT_USE_MOCKS", raising=False)
+    monkeypatch.setenv("GITHUB_REPO", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF", "main")
+    monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
+    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("tools.github_api.requests.post", fake_post)
+    monkeypatch.setattr("tools.github_api.requests.put", fake_put)
+    monkeypatch.setattr("tools.github_api.requests.delete", fake_delete)
+
+    result = create_github_pr(
+        filename="demo_failing_etl.py",
+        fixed_content="print('fixed')\n",
+        pr_title="fix(demo_failing_etl): correct key name",
+        pr_body="Root cause: wrong key.",
+    )
+
+    assert "HTTP 422" in result["error"]
+    assert deleted[0].startswith("https://api.github.com/repos/owner/repo/git/refs/heads/agent/fix-demo_failing_etl-")

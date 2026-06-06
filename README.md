@@ -17,6 +17,13 @@ Copy `airflow/.env.example` to `airflow/.env` and fill the `AIRFLOW_VAR_*` value
 
 The local Airflow instance only calls AgentCore. The failed task metadata and log excerpt are sent in the invoke payload, so the AgentCore runtime does not need network access back into local Airflow.
 
+## Demo DAGs
+
+- `demo_failing_etl`: simple bad key lookup.
+- `demo_schema_contract_etl`: upstream/downstream task payload contract mismatch.
+- `demo_missing_config_etl`: missing runtime configuration.
+- `demo_sql_schema_etl`: SQL references a column that is not present in the staged table.
+
 ## AgentCore Execution Role
 
 Create an IAM execution role for AgentCore Runtime with the templates in `infra/iam/`.

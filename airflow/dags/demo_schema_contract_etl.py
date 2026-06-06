@@ -15,26 +15,36 @@ except ImportError:
     from airflow.utils.trigger_rule import TriggerRule
 
 
-def fail_transform() -> dict:
-    data = {"rows": 100, "source": "demo"}
-    # Intentional demo failure: extract emits "rows", not "rowz".
-    return {"transformed": data["rowz"]}
+def extract_orders() -> dict[str, Any]:
+    return {
+        "batch_id": "orders-2026-06-06",
+        "records": [
+            {"order_id": "A-100", "amount": "19.95"},
+            {"order_id": "A-101", "amount": "24.50"},
+        ],
+    }
+
+
+def normalize_orders(**context: Any) -> dict[str, Any]:
+    payload = context["ti"].xcom_pull(task_ids="extract_orders")
+    rows = payload["rows"]
+    return {"order_count": len(rows)}
 
 
 def collect_failure_context(**context: Any) -> str:
-    return collect_failure_context_payload("demo_failing_etl.py", "transform", **context)
+    return collect_failure_context_payload("demo_schema_contract_etl.py", "normalize_orders", **context)
 
 
 with DAG(
-    dag_id="demo_failing_etl",
+    dag_id="demo_schema_contract_etl",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    tags=["agentic-airflow", "demo"],
+    tags=["agentic-airflow", "demo", "schema"],
 ):
-    extract = EmptyOperator(task_id="extract")
-    transform = PythonOperator(task_id="transform", python_callable=fail_transform)
-    load = EmptyOperator(task_id="load")
+    extract = PythonOperator(task_id="extract_orders", python_callable=extract_orders)
+    normalize = PythonOperator(task_id="normalize_orders", python_callable=normalize_orders)
+    publish = EmptyOperator(task_id="publish_orders")
 
     failure_context = PythonOperator(
         task_id="collect_failure_context",
@@ -49,5 +59,5 @@ with DAG(
         botocore_config={"read_timeout": 300},
     )
 
-    extract >> transform >> load
-    [extract, transform, load] >> failure_context >> troubleshoot
+    extract >> normalize >> publish
+    [extract, normalize, publish] >> failure_context >> troubleshoot
