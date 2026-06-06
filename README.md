@@ -1,6 +1,6 @@
 # Agentic Airflow PoC
 
-Apache Airflow local invoking an Amazon Bedrock AgentCore Runtime to troubleshoot failed DAG tasks and post findings to Slack.
+Apache Airflow local invoking an Amazon Bedrock AgentCore Runtime to troubleshoot failed DAG tasks, open a draft GitHub PR with the suggested fix, and post findings to Slack.
 
 ## Prerequisites
 
@@ -8,11 +8,8 @@ Apache Airflow local invoking an Amazon Bedrock AgentCore Runtime to troubleshoo
 - Python 3.11+
 - AWS CLI configured for Bedrock, AgentCore, ECR, and IAM
 - Bedrock model access in the target region
-- GitHub PAT with read-only access to this repo
+- GitHub PAT with read and write access to this repo (Contents + Pull requests)
 - Slack incoming webhook
-- ngrok or equivalent tunnel for local Airflow
-
-See [PLAN.MD](PLAN.MD) for the implementation plan.
 
 ## Local Airflow Configuration
 

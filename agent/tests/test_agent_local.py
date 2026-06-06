@@ -11,6 +11,9 @@ def test_deterministic_troubleshoot_returns_summary(monkeypatch):
     assert "KeyError" in result["summary"]
     assert "data['rowz']" in result["likely_cause"]
     assert result["slack"]["ok"] is True
+    assert "pr_url" in result
+    assert result["pr_url"] is not None
+    assert result["slack"]["message"]["pr_url"] == result["pr_url"]
 
 
 def test_deterministic_troubleshoot_rejects_real_data_without_model(monkeypatch):

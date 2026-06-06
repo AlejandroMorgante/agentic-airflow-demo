@@ -21,6 +21,7 @@ def _mock_slack_message(
     what_happened: str,
     likely_cause: str,
     suggested_fix: str,
+    pr_url: str | None,
     airflow_url: str | None,
 ) -> dict[str, Any]:
     message = {
@@ -30,6 +31,7 @@ def _mock_slack_message(
         "what_happened": what_happened,
         "likely_cause": likely_cause,
         "suggested_fix": suggested_fix,
+        "pr_url": pr_url,
         "airflow_url": airflow_url,
     }
     log.info("Mock post_to_slack payload=%s", message)
@@ -44,6 +46,7 @@ def post_to_slack(
     what_happened: str,
     likely_cause: str,
     suggested_fix: str,
+    pr_url: str | None = None,
     airflow_url: str | None = None,
 ) -> dict[str, Any]:
     """Post a structured troubleshooting message to Slack."""
@@ -55,6 +58,7 @@ def post_to_slack(
             what_happened,
             likely_cause,
             suggested_fix,
+            pr_url,
             airflow_url,
         )
 
@@ -65,30 +69,37 @@ def post_to_slack(
         if airflow_url:
             footer = f"{footer} | Airflow: {airflow_url.rstrip('/')}/dags/{dag_id}"
 
+        blocks: list[dict[str, Any]] = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"Airflow task failed: {dag_id}.{task_id}",
+                },
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*What happened*\n{what_happened}"},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Likely cause*\n{likely_cause}"},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Suggested fix*\n```{suggested_fix}```"},
+            },
+        ]
+        if pr_url:
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Fix PR*\n<{pr_url}|View draft PR>"},
+            })
+        blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": footer}]})
+
         payload = {
             "text": f"Airflow task failed: {dag_id}.{task_id}",
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": f"Airflow task failed: {dag_id}.{task_id}",
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": f"*What happened*\n{what_happened}"},
-                },
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": f"*Likely cause*\n{likely_cause}"},
-                },
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": f"*Suggested fix*\n{suggested_fix}"},
-                },
-                {"type": "context", "elements": [{"type": "mrkdwn", "text": footer}]},
-            ],
+            "blocks": blocks,
         }
         log.info("Posting Slack message for %s.%s", dag_id, task_id)
         resp = requests.post(webhook_url, json=payload, timeout=15)

@@ -1,5 +1,5 @@
 from tools.airflow_api import fetch_failed_tasks, fetch_task_logs
-from tools.github_api import fetch_dag_source
+from tools.github_api import create_github_pr, fetch_dag_source
 from tools.slack import post_to_slack
 
 
@@ -64,6 +64,36 @@ def test_airflow_api_url_encodes_path_parts(monkeypatch):
 
     assert "demo%2Ffailing" in calls[0]
     assert "manual__2026-06-05T12%3A00%3A00%2B00%3A00" in calls[0]
+
+
+def test_mock_create_github_pr_returns_pr_url(monkeypatch):
+    monkeypatch.setenv("AGENT_USE_MOCKS", "true")
+    result = create_github_pr(
+        filename="demo_failing_etl.py",
+        fixed_content='return {"transformed": data["rows"]}',
+        pr_title="fix(demo_failing_etl): correct key name",
+        pr_body="Root cause: wrong key.",
+    )
+
+    assert result["mock"] is True
+    assert "pr_url" in result
+    assert result["pr_number"] == 1
+
+
+def test_mock_slack_includes_pr_url(monkeypatch):
+    monkeypatch.setenv("AGENT_USE_MOCKS", "true")
+    result = post_to_slack(
+        dag_id="demo_failing_etl",
+        task_id="transform",
+        run_id="manual__test",
+        what_happened="failed",
+        likely_cause="bad key",
+        suggested_fix="fix key",
+        pr_url="https://github.com/owner/repo/pull/42",
+    )
+
+    assert result["ok"] is True
+    assert result["message"]["pr_url"] == "https://github.com/owner/repo/pull/42"
 
 
 def test_github_source_uses_prefix_and_ref(monkeypatch):
