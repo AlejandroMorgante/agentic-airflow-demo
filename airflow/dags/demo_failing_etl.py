@@ -17,8 +17,8 @@ except ImportError:
 
 def fail_transform() -> dict:
     data = {"rows": 100, "source": "demo"}
-    # Intentional demo failure: extract emits "rows", not "rowz".
-    return {"transformed": data["rowz"]}
+    # Fixed: extract emits "rows", not "rowz".
+    return {"transformed": data["rows"]}
 
 
 def collect_failure_context(**context: Any) -> str:
