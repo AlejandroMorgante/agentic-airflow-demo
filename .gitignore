@@ -7,6 +7,7 @@ logs/
 *.log
 .idea/
 .vscode/
+PLAN.MD
 airflow/logs/
 airflow/plugins/
 airflow/config/*
