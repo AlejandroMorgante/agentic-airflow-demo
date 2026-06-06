@@ -7,7 +7,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Callable
 
-from tools.airflow_api import fetch_failed_tasks, fetch_task_logs
 from tools.github_api import fetch_dag_source
 from tools.slack import post_to_slack
 
@@ -76,7 +75,7 @@ if USE_MODEL:
     strands_agent = Agent(
         model=BedrockModel(model_id=MODEL_ID),
         system_prompt=SYSTEM_PROMPT,
-        tools=[fetch_failed_tasks, fetch_task_logs, fetch_dag_source, post_to_slack],
+        tools=[fetch_dag_source, post_to_slack],
     )
 
 
@@ -88,22 +87,9 @@ def _deterministic_troubleshoot(dag_id: str, run_id: str) -> dict[str, Any]:
             "Set AGENT_USE_MODEL=true to analyze real Airflow/GitHub data."
         )
 
-    failed_tasks = fetch_failed_tasks(dag_id, run_id)
-    if not failed_tasks:
-        return {"summary": "No failed tasks found", "dag_id": dag_id, "run_id": run_id}
-    if failed_tasks[0].get("error"):
-        return {
-            "summary": "Failed to query Airflow for failed tasks",
-            "dag_id": dag_id,
-            "run_id": run_id,
-            "error": failed_tasks[0]["error"],
-        }
-
-    task = failed_tasks[0]
-    task_id = task["task_id"]
-    try_number = int(task.get("try_number") or 1)
-    logs = fetch_task_logs(dag_id, run_id, task_id, try_number)
-    filename = task.get("dag_file") or task.get("fileloc") or f"{dag_id}.py"
+    task_id = "transform"
+    logs = "KeyError: 'rowz'"
+    filename = f"{dag_id}.py"
     source = fetch_dag_source(str(filename).split("/")[-1])
 
     likely_cause = "The transform task reads data['rowz'], but extract returns the key 'rows'."
@@ -131,6 +117,16 @@ def _deterministic_troubleshoot(dag_id: str, run_id: str) -> dict[str, Any]:
     }
 
 
+def _payload_prompt(payload: dict[str, Any]) -> str:
+    return (
+        "Troubleshoot this Airflow failure using the JSON payload below. "
+        "The payload already contains the failed task and log excerpt from Airflow. "
+        "Read the DAG source from GitHub, analyze the logs and source together, "
+        "then post a clear explanation with a suggested fix to Slack.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
 @app.entrypoint
 def troubleshoot(payload: dict[str, Any]) -> dict[str, Any]:
     dag_id = payload["dag_id"]
@@ -140,12 +136,7 @@ def troubleshoot(payload: dict[str, Any]) -> dict[str, Any]:
     if strands_agent is None:
         return _deterministic_troubleshoot(dag_id, run_id)
 
-    prompt = (
-        f"A task in DAG `{dag_id}` failed during run `{run_id}`. "
-        "Follow your standard troubleshooting procedure: identify the failed task, "
-        "read its logs, read the DAG source from GitHub, analyze the cause, and "
-        "post a clear explanation with a suggested fix to Slack."
-    )
+    prompt = _payload_prompt(payload)
     result = strands_agent(prompt)
     return {"summary": str(result)}
 

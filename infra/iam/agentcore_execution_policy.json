@@ -37,6 +37,15 @@
         "arn:aws:bedrock:*::foundation-model/*",
         "arn:aws:bedrock:<AWS_REGION>:<AWS_ACCOUNT_ID>:*"
       ]
+    },
+    {
+      "Sid": "BedrockMarketplaceSubscription",
+      "Effect": "Allow",
+      "Action": [
+        "aws-marketplace:ViewSubscriptions",
+        "aws-marketplace:Subscribe"
+      ],
+      "Resource": "*"
     }
   ]
 }

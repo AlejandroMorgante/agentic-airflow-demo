@@ -34,9 +34,6 @@ with DAG(
         network_configuration={"networkMode": "PUBLIC"},
         create_agent_runtime_kwargs={
             "environmentVariables": {
-                "AIRFLOW_BASE_URL": "{{ var.value.AIRFLOW_BASE_URL }}",
-                "AIRFLOW_USERNAME": "{{ var.value.get('AIRFLOW_USERNAME', 'admin') }}",
-                "AIRFLOW_PASSWORD": "{{ var.value.get('AIRFLOW_PASSWORD', 'admin') }}",
                 "BEDROCK_MODEL_ID": "{{ var.value.BEDROCK_MODEL_ID }}",
                 "GITHUB_REPO": "{{ var.value.GITHUB_REPO }}",
                 "GITHUB_REF": "{{ var.value.get('GITHUB_REF', 'main') }}",
@@ -68,6 +65,13 @@ with DAG(
         payload={
             "dag_id": "demo_failing_etl",
             "run_id": "manual__agentcore_smoke",
+            "dag_file": "demo_failing_etl.py",
+            "failed_task": {
+                "task_id": "transform",
+                "state": "failed",
+                "try_number": 1,
+            },
+            "log_excerpt": "KeyError: 'rowz'",
         },
         botocore_config={"read_timeout": 300},
     )

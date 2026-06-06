@@ -14,6 +14,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__BASE_URL: http://localhost:8080
     AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__CORE__INTERNAL_API_SECRET_KEY: local-dev-internal-api-secret-key
+    AIRFLOW__API_AUTH__JWT_SECRET: local-dev-api-auth-jwt-secret
     AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/simple_auth_manager_passwords.json

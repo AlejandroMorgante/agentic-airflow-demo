@@ -18,9 +18,11 @@ See [PLAN.MD](PLAN.MD) for the implementation plan.
 
 Copy `airflow/.env.example` to `airflow/.env` and fill the `AIRFLOW_VAR_*` values. Airflow exposes those env vars as `{{ var.value.* }}`, so the AgentCore setup DAGs do not require manually creating Airflow Variables in the UI.
 
+The local Airflow instance only calls AgentCore. The failed task metadata and log excerpt are sent in the invoke payload, so the AgentCore runtime does not need network access back into local Airflow.
+
 ## AgentCore Execution Role
 
 Create an IAM execution role for AgentCore Runtime with the templates in `infra/iam/`.
 Replace `<AWS_REGION>` and `<AWS_ACCOUNT_ID>`, create the role, attach the inline policy, and set the resulting ARN in `AIRFLOW_VAR_AGENTCORE_EXECUTION_ROLE_ARN`.
 
-For the local PoC, `AIRFLOW_VAR_AIRFLOW_BASE_URL` must be a public tunnel URL that AgentCore can reach, such as an ngrok URL for `localhost:8080`.
+For this PoC, the AgentCore runtime uses GitHub for DAG source and Slack for the report. Airflow is not exposed publicly.

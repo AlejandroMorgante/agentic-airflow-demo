@@ -50,19 +50,22 @@ def fetch_dag_source(filename: str) -> str:
 
     try:
         repo = os.environ["GITHUB_REPO"]
-        token = os.environ["GITHUB_TOKEN"]
+        token = os.environ.get("GITHUB_TOKEN")
         ref = os.environ.get("GITHUB_REF", "main")
         path = _content_path(filename)
         encoded_path = quote(path, safe="/")
         url = f"https://api.github.com/repos/{repo}/contents/{encoded_path}"
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
         log.info("GitHub GET repo=%s path=%s ref=%s", repo, path, ref)
         resp = requests.get(
             url,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
+            headers=headers,
             params={"ref": ref},
             timeout=15,
         )
