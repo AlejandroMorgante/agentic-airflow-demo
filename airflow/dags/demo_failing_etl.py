@@ -22,7 +22,7 @@ LOG_TAIL_CHARS = 8000
 def fail_transform() -> dict:
     data = {"rows": 100, "source": "demo"}
     # Intentional demo failure: extract emits "rows", not "rowz".
-    return {"transformed": data["rowz"]}
+    return {"transformed": data["rows"]}
 
 
 def _task_log_dir(dag_id: str, run_id: str, task_id: str) -> Path:
