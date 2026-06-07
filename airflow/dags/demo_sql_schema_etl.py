@@ -19,13 +19,13 @@ except ImportError:
 def build_customer_report() -> list[tuple[Any, ...]]:
     connection = sqlite3.connect(":memory:")
     connection.execute(
-        "create table orders (order_id text, customer_id text, amount real)"
+        "create table orders (order_id text, customer_id text, amount real, customer_tier text)"
     )
     connection.executemany(
-        "insert into orders values (?, ?, ?)",
+        "insert into orders values (?, ?, ?, ?)",
         [
-            ("A-100", "C-001", 19.95),
-            ("A-101", "C-002", 24.50),
+            ("A-100", "C-001", 19.95, "Gold"),
+            ("A-101", "C-002", 24.50, "Silver"),
         ],
     )
     return connection.execute(
