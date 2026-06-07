@@ -1,0 +1,2 @@
+# Runtime dependencies for the local Airflow image.
+# The Amazon provider is installed from the PR merge commit in Dockerfile.
