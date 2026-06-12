@@ -4,8 +4,10 @@ import sqlite3
 from typing import Any
 
 import pendulum
-from _failure_context import collect_failure_context_payload
-from airflow.providers.amazon.aws.operators.bedrock import BedrockInvokeAgentRuntimeOperator
+from aws_agentcore._failure_context import collect_failure_context_payload
+from airflow.providers.amazon.aws.operators.bedrock import (
+    BedrockInvokeAgentRuntimeOperator,
+)
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.sdk import DAG
@@ -38,18 +40,22 @@ def build_customer_report() -> list[tuple[Any, ...]]:
 
 
 def collect_failure_context(**context: Any) -> str:
-    return collect_failure_context_payload("demo_sql_schema_etl.py", "build_customer_report", **context)
+    return collect_failure_context_payload(
+        "aws_agentcore/demo_sql_schema_etl.py", "build_customer_report", **context
+    )
 
 
 with DAG(
-    dag_id="demo_sql_schema_etl",
+    dag_id="aws_agentcore_demo_sql_schema_etl",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    tags=["agentic-airflow", "demo", "sql"],
+    tags=["agentic-airflow", "aws", "agentcore", "demo", "sql"],
 ):
     stage_orders = EmptyOperator(task_id="stage_orders")
-    report = PythonOperator(task_id="build_customer_report", python_callable=build_customer_report)
+    report = PythonOperator(
+        task_id="build_customer_report", python_callable=build_customer_report
+    )
     publish = EmptyOperator(task_id="publish_report")
 
     failure_context = PythonOperator(

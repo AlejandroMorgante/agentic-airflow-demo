@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import quote
 
 import requests
-from tools.strands_compat import tool
+from shared.tools.strands_compat import tool
 
 log = logging.getLogger(__name__)
 

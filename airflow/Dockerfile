@@ -1,7 +1,5 @@
 FROM apache/airflow:3.0.6
 
-ARG AIRFLOW_PROVIDER_REF=0ac475f1d8a50657ed80b4ef495e02ab2add8c01
-
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
@@ -10,4 +8,7 @@ RUN apt-get update \
 
 USER airflow
 RUN pip install --no-cache-dir \
-    "apache-airflow-providers-amazon @ git+https://github.com/apache/airflow.git@${AIRFLOW_PROVIDER_REF}#subdirectory=providers/amazon"
+    "apache-airflow-providers-amazon==9.30.0" \
+    "apache-airflow-providers-google @ git+https://github.com/apache/airflow.git@refs/pull/68479/head#subdirectory=providers/google" \
+    "google-cloud-aiplatform>=1.155.0" \
+    "google-genai>=1.0.0"

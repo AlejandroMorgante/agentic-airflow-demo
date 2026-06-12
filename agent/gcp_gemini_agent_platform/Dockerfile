@@ -5,11 +5,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY aws_agentcore/requirements.txt ./requirements.txt
+COPY gcp_gemini_agent_platform/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY shared/ shared/
-COPY aws_agentcore/agent.py .
+COPY gcp_gemini_agent_platform/agent.py .
 
 EXPOSE 8080
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 import pendulum
-from _failure_context import collect_failure_context_payload
-from airflow.providers.amazon.aws.operators.bedrock import BedrockInvokeAgentRuntimeOperator
+from aws_agentcore._failure_context import collect_failure_context_payload
+from airflow.providers.amazon.aws.operators.bedrock import (
+    BedrockInvokeAgentRuntimeOperator,
+)
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.sdk import DAG
@@ -22,15 +24,17 @@ def fail_transform() -> dict:
 
 
 def collect_failure_context(**context: Any) -> str:
-    return collect_failure_context_payload("demo_failing_etl.py", "transform", **context)
+    return collect_failure_context_payload(
+        "aws_agentcore/demo_failing_etl.py", "transform", **context
+    )
 
 
 with DAG(
-    dag_id="demo_failing_etl",
+    dag_id="aws_agentcore_demo_failing_etl",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    tags=["agentic-airflow", "demo"],
+    tags=["agentic-airflow", "aws", "agentcore", "demo"],
 ):
     extract = EmptyOperator(task_id="extract")
     transform = PythonOperator(task_id="transform", python_callable=fail_transform)

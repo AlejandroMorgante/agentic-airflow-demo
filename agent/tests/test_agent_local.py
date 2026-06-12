@@ -1,6 +1,6 @@
 import pytest
 
-from agent import troubleshoot
+from shared.troubleshooting import troubleshoot
 
 
 def test_deterministic_troubleshoot_returns_summary(monkeypatch):

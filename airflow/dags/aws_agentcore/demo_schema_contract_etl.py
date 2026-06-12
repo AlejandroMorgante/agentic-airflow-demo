@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 import pendulum
-from _failure_context import collect_failure_context_payload
-from airflow.providers.amazon.aws.operators.bedrock import BedrockInvokeAgentRuntimeOperator
+from aws_agentcore._failure_context import collect_failure_context_payload
+from airflow.providers.amazon.aws.operators.bedrock import (
+    BedrockInvokeAgentRuntimeOperator,
+)
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.sdk import DAG
@@ -32,18 +34,22 @@ def normalize_orders(**context: Any) -> dict[str, Any]:
 
 
 def collect_failure_context(**context: Any) -> str:
-    return collect_failure_context_payload("demo_schema_contract_etl.py", "normalize_orders", **context)
+    return collect_failure_context_payload(
+        "aws_agentcore/demo_schema_contract_etl.py", "normalize_orders", **context
+    )
 
 
 with DAG(
-    dag_id="demo_schema_contract_etl",
+    dag_id="aws_agentcore_demo_schema_contract_etl",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    tags=["agentic-airflow", "demo", "schema"],
+    tags=["agentic-airflow", "aws", "agentcore", "demo", "schema"],
 ):
     extract = PythonOperator(task_id="extract_orders", python_callable=extract_orders)
-    normalize = PythonOperator(task_id="normalize_orders", python_callable=normalize_orders)
+    normalize = PythonOperator(
+        task_id="normalize_orders", python_callable=normalize_orders
+    )
     publish = EmptyOperator(task_id="publish_orders")
 
     failure_context = PythonOperator(

@@ -1,6 +1,6 @@
-from tools.airflow_api import fetch_failed_tasks, fetch_task_logs
-from tools.github_api import create_github_pr, fetch_dag_source
-from tools.slack import post_to_slack
+from shared.tools.airflow_api import fetch_failed_tasks, fetch_task_logs
+from shared.tools.github_api import create_github_pr, fetch_dag_source
+from shared.tools.slack import post_to_slack
 
 
 class _FakeJsonResponse:
@@ -59,7 +59,7 @@ def test_airflow_api_url_encodes_path_parts(monkeypatch):
     monkeypatch.setenv("AIRFLOW_BASE_URL", "https://airflow.example")
     monkeypatch.setenv("AIRFLOW_USERNAME", "admin")
     monkeypatch.setenv("AIRFLOW_PASSWORD", "admin")
-    monkeypatch.setattr("tools.airflow_api.requests.get", fake_get)
+    monkeypatch.setattr("shared.tools.airflow_api.requests.get", fake_get)
 
     fetch_failed_tasks("demo/failing", "manual__2026-06-05T12:00:00+00:00")
 
@@ -109,7 +109,7 @@ def test_github_source_uses_prefix_and_ref(monkeypatch):
     monkeypatch.setenv("GITHUB_TOKEN", "token")
     monkeypatch.setenv("GITHUB_REF", "feature/demo")
     monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
-    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("shared.tools.github_api.requests.get", fake_get)
 
     source = fetch_dag_source("demo_failing_etl.py")
 
@@ -161,9 +161,9 @@ def test_create_github_pr_uses_draft_pr_and_deterministic_branch(monkeypatch):
     monkeypatch.setenv("GITHUB_REPO", "owner/repo")
     monkeypatch.setenv("GITHUB_REF", "main")
     monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
-    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
-    monkeypatch.setattr("tools.github_api.requests.post", fake_post)
-    monkeypatch.setattr("tools.github_api.requests.put", fake_put)
+    monkeypatch.setattr("shared.tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("shared.tools.github_api.requests.post", fake_post)
+    monkeypatch.setattr("shared.tools.github_api.requests.put", fake_put)
 
     result = create_github_pr(
         filename="demo_failing_etl.py",
@@ -197,8 +197,8 @@ def test_create_github_pr_returns_existing_pr_without_new_branch(monkeypatch):
     monkeypatch.setenv("GITHUB_REPO", "owner/repo")
     monkeypatch.setenv("GITHUB_REF", "main")
     monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
-    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
-    monkeypatch.setattr("tools.github_api.requests.post", fake_post)
+    monkeypatch.setattr("shared.tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("shared.tools.github_api.requests.post", fake_post)
 
     result = create_github_pr(
         filename="demo_failing_etl.py",
@@ -242,10 +242,10 @@ def test_create_github_pr_cleans_created_branch_on_pr_failure(monkeypatch):
     monkeypatch.setenv("GITHUB_REPO", "owner/repo")
     monkeypatch.setenv("GITHUB_REF", "main")
     monkeypatch.setenv("GITHUB_DAG_PATH", "airflow/dags")
-    monkeypatch.setattr("tools.github_api.requests.get", fake_get)
-    monkeypatch.setattr("tools.github_api.requests.post", fake_post)
-    monkeypatch.setattr("tools.github_api.requests.put", fake_put)
-    monkeypatch.setattr("tools.github_api.requests.delete", fake_delete)
+    monkeypatch.setattr("shared.tools.github_api.requests.get", fake_get)
+    monkeypatch.setattr("shared.tools.github_api.requests.post", fake_post)
+    monkeypatch.setattr("shared.tools.github_api.requests.put", fake_put)
+    monkeypatch.setattr("shared.tools.github_api.requests.delete", fake_delete)
 
     result = create_github_pr(
         filename="demo_failing_etl.py",
