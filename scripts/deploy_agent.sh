@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the AWS AgentCore agent image and push to ECR.
-# Runtime lifecycle (create/delete) is managed via the Airflow DAGs in _agentcore_setup.py.
+# Runtime lifecycle (create/delete) is managed via the Airflow DAGs in aws_agentcore/setup.py.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
