@@ -49,9 +49,9 @@ def build_customer_report() -> list[tuple[Any, ...]]:
     )
     return connection.execute(
         """
-        select customer_id, customer_tier, sum(amount) as total_amount
+        select customer_id, sum(amount) as total_amount
         from orders
-        group by customer_id, customer_tier
+        group by customer_id
         """
     ).fetchall()
 
