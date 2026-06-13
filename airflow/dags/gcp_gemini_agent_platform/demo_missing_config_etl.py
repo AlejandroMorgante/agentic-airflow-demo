@@ -22,6 +22,7 @@ from typing import Any
 
 import pendulum
 from gcp_gemini_agent_platform._failure_context import collect_failure_context_payload
+from airflow.models import Variable
 from airflow.providers.google.cloud.operators.vertex_ai.agent_engine import (
     QueryAgentEngineOperator,
 )
@@ -36,7 +37,7 @@ except ImportError:
 
 
 def resolve_target_table() -> dict[str, str]:
-    schema = os.environ["WAREHOUSE_SCHEMA"]
+    schema = Variable.get("WAREHOUSE_SCHEMA")
     return {"target_table": f"{schema}.daily_order_summary"}
 
 
