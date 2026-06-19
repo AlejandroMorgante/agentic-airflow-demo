@@ -36,7 +36,7 @@ except ImportError:
 
 
 def resolve_target_table() -> dict[str, str]:
-    schema = os.environ["WAREHOUSE_SCHEMA"]
+    schema = os.environ.get("WAREHOUSE_SCHEMA", "dwh")
     return {"target_table": f"{schema}.daily_order_summary"}
 
 
