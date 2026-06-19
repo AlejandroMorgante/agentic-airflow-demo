@@ -17,8 +17,11 @@
 # under the License.
 from __future__ import annotations
 
+import json
+
 import pendulum
 from airflow.providers.google.cloud.operators.vertex_ai.agent_engine import (
+    CheckQueryAgentEngineOperator,
     CreateAgentEngineOperator,
     DeleteAgentEngineOperator,
     GetAgentEngineOperator,
@@ -41,6 +44,14 @@ DISPLAY_NAME = (
     "{{ var.value.get('GCP_AGENT_ENGINE_DISPLAY_NAME', 'airflow-agent-engine') }}"
 )
 CONTAINER_URI = "{{ var.value.GCP_AGENT_ENGINE_CONTAINER_URI }}"
+QUERY_OUTPUT_GCS_URI = (
+    "{{ var.value.get('GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI', "
+    "'gs://' ~ var.value.GCP_PROJECT_ID ~ '-agent-engine-query-output/query-output/') }}"
+)
+AGENT_ENGINE_ID = "{{ var.value.GCP_AGENT_ENGINE_NAME.split('/')[-1] }}"
+CREATED_AGENT_ENGINE_ID = (
+    "{{ ti.xcom_pull(task_ids='create_agent_engine')['name'].split('/')[-1] }}"
+)
 
 CREATE_AGENT_ENGINE_CONFIG = {
     "display_name": DISPLAY_NAME,
@@ -78,18 +89,22 @@ UPDATE_AGENT_ENGINE_CONFIG = {
 }
 
 QUERY_CONFIG = {
-    "input": {
-        "dag_id": "gcp_agentengine_demo_failing_etl",
-        "run_id": "manual__agentengine_smoke",
-        "dag_file": "gcp_gemini_agent_platform/demo_failing_etl.py",
-        "failed_task": {
-            "task_id": "transform",
-            "state": "failed",
-            "try_number": 1,
-        },
-        "log_excerpt": "KeyError: 'rowz'",
-    },
+    "query": json.dumps(
+        {
+            "dag_id": "gcp_agentengine_demo_failing_etl",
+            "run_id": "manual__agentengine_smoke",
+            "dag_file": "gcp_gemini_agent_platform/demo_failing_etl.py",
+            "failed_task": {
+                "task_id": "transform",
+                "state": "failed",
+                "try_number": 1,
+            },
+            "log_excerpt": "KeyError: 'rowz'",
+        }
+    ),
+    "output_gcs_uri": QUERY_OUTPUT_GCS_URI,
 }
+CHECK_QUERY_CONFIG = {"retrieve_result": True}
 
 
 with DAG(
@@ -120,7 +135,7 @@ with DAG(
         task_id="get_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ var.value.GCP_AGENT_ENGINE_NAME }}",
+        agent_engine_id=AGENT_ENGINE_ID,
     )
 
 
@@ -136,9 +151,21 @@ with DAG(
         task_id="query_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ var.value.GCP_AGENT_ENGINE_NAME }}",
+        agent_engine_id=AGENT_ENGINE_ID,
         config=QUERY_CONFIG,
     )
+    check_query_agent_engine = CheckQueryAgentEngineOperator(
+        task_id="check_query_agent_engine",
+        project_id=PROJECT_ID,
+        location=LOCATION,
+        operation_name="{{ ti.xcom_pull(task_ids='query_agent_engine')['job_name'] }}",
+        config=CHECK_QUERY_CONFIG,
+        poll_interval=10,
+        timeout=900,
+        deferrable=True,
+    )
+
+    query_agent_engine >> check_query_agent_engine
 
 
 with DAG(
@@ -153,7 +180,7 @@ with DAG(
         task_id="update_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ var.value.GCP_AGENT_ENGINE_NAME }}",
+        agent_engine_id=AGENT_ENGINE_ID,
         config=UPDATE_AGENT_ENGINE_CONFIG,
     )
 
@@ -170,7 +197,7 @@ with DAG(
         task_id="delete_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ var.value.GCP_AGENT_ENGINE_NAME }}",
+        agent_engine_id=AGENT_ENGINE_ID,
         force=True,
         deferrable=True,
         trigger_rule=TriggerRule.ALL_DONE,
@@ -195,35 +222,47 @@ with DAG(
         task_id="get_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ ti.xcom_pull(task_ids='create_agent_engine', key='agent_engine_name') }}",
+        agent_engine_id=CREATED_AGENT_ENGINE_ID,
     )
     query_agent_engine = QueryAgentEngineOperator(
         task_id="query_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ ti.xcom_pull(task_ids='create_agent_engine', key='agent_engine_name') }}",
+        agent_engine_id=CREATED_AGENT_ENGINE_ID,
         config=QUERY_CONFIG,
+    )
+    check_query_agent_engine = CheckQueryAgentEngineOperator(
+        task_id="check_query_agent_engine",
+        project_id=PROJECT_ID,
+        location=LOCATION,
+        operation_name="{{ ti.xcom_pull(task_ids='query_agent_engine')['job_name'] }}",
+        config=CHECK_QUERY_CONFIG,
+        poll_interval=10,
+        timeout=900,
+        deferrable=True,
     )
     update_agent_engine = UpdateAgentEngineOperator(
         task_id="update_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ ti.xcom_pull(task_ids='create_agent_engine', key='agent_engine_name') }}",
+        agent_engine_id=CREATED_AGENT_ENGINE_ID,
         config=UPDATE_AGENT_ENGINE_CONFIG,
     )
     delete_agent_engine = DeleteAgentEngineOperator(
         task_id="delete_agent_engine",
         project_id=PROJECT_ID,
         location=LOCATION,
-        name="{{ ti.xcom_pull(task_ids='create_agent_engine', key='agent_engine_name') }}",
+        agent_engine_id=CREATED_AGENT_ENGINE_ID,
         force=True,
         deferrable=True,
+        trigger_rule=TriggerRule.ALL_DONE,
     )
 
     (
         create_agent_engine
         >> get_agent_engine
         >> query_agent_engine
+        >> check_query_agent_engine
         >> update_agent_engine
         >> delete_agent_engine
     )

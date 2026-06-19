@@ -37,22 +37,30 @@ class LocalInvocationApp:
                 self.wfile.write(body)
 
             def do_POST(self) -> None:
-                if self.path not in {"/invocations", "/api/reasoning_engine"}:
+                if self.path not in {"/", "/invocations", "/api/reasoning_engine"}:
                     self.send_response(404)
                     self.end_headers()
                     return
 
-                length = int(self.headers.get("content-length", "0"))
-                payload = json.loads(self.rfile.read(length) or b"{}")
-                if self.path == "/api/reasoning_engine":
-                    input_val = payload.get("input") or payload
-                    if isinstance(input_val, str):
-                        input_val = json.loads(input_val)
-                    response = {"output": handler_func(input_val)}
-                else:
-                    response = handler_func(payload)
+                try:
+                    length = int(self.headers.get("content-length", "0"))
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                    log.info("Received invocation on %s with keys=%s", self.path, sorted(payload))
+                    if self.path in {"/", "/api/reasoning_engine"}:
+                        input_val = payload.get("input") or payload
+                        if isinstance(input_val, str):
+                            input_val = json.loads(input_val)
+                        response = {"output": handler_func(input_val)}
+                    else:
+                        response = handler_func(payload)
+                    status = 200
+                except Exception as exc:
+                    log.exception("Invocation failed on %s", self.path)
+                    response = {"error": str(exc)}
+                    status = 500
+
                 body = json.dumps(response).encode()
-                self.send_response(200)
+                self.send_response(status)
                 self.send_header("content-type", "application/json")
                 self.send_header("content-length", str(len(body)))
                 self.end_headers()

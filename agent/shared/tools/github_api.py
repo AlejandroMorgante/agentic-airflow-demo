@@ -69,9 +69,9 @@ def _content_path(filename: str) -> str:
         raise ValueError("filename must point to a DAG file")
     if ".." in cleaned.split("/"):
         raise ValueError("filename must not contain parent directory segments")
-    if "/" in filename:
-        if cleaned != prefix and not cleaned.startswith(f"{prefix}/"):
-            raise ValueError(f"filename must be under {prefix}")
+    if any(part.startswith(".") for part in cleaned.split("/")):
+        raise ValueError(f"filename must be under {prefix}")
+    if cleaned.startswith(f"{prefix}/") or cleaned == prefix:
         return cleaned
     return f"{prefix}/{cleaned}"
 

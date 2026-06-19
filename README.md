@@ -129,6 +129,7 @@ GCP values:
 AIRFLOW_VAR_GCP_PROJECT_ID=<gcp-project-id>
 AIRFLOW_VAR_GCP_REGION=us-central1
 AIRFLOW_VAR_GCP_AGENT_ENGINE_CONTAINER_URI=<region>-docker.pkg.dev/<project>/<repository>/airflow-troubleshooting-agent:<tag>
+AIRFLOW_VAR_GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI=gs://<gcp-project-id>-agent-engine-query-output/query-output/
 AIRFLOW_VAR_GCP_AGENT_ENGINE_DISPLAY_NAME=airflow-agent-engine
 AIRFLOW_VAR_GEMINI_MODEL_ID=gemini-2.5-pro
 AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT=google-cloud-platform://?extra__google_cloud_platform__project=<gcp-project-id>&extra__google_cloud_platform__scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform
@@ -224,6 +225,7 @@ The script prints the pushed image URI. Put that value in:
 
 ```bash
 AIRFLOW_VAR_GCP_AGENT_ENGINE_CONTAINER_URI=<printed-image-uri>
+AIRFLOW_VAR_GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI=gs://<gcp-project-id>-agent-engine-query-output/query-output/
 ```
 
 Restart Airflow so the env value is loaded:
