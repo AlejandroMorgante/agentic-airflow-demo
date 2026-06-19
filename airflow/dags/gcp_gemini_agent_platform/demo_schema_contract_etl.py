@@ -47,7 +47,7 @@ def extract_orders() -> dict[str, Any]:
 
 def normalize_orders(**context: Any) -> dict[str, Any]:
     payload = context["ti"].xcom_pull(task_ids="extract_orders")
-    rows = payload["rows"]
+    rows = payload["records"]
     return {"order_count": len(rows)}
 
 
