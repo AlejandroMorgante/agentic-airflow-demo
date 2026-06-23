@@ -10,5 +10,6 @@ USER airflow
 RUN pip install --no-cache-dir \
     "apache-airflow-providers-amazon==9.30.0" \
     "apache-airflow-providers-google @ git+https://github.com/apache/airflow.git@8473b091e30d4983b147d89ae2930f179f52c79d#subdirectory=providers/google" \
+    "apache-airflow-providers-microsoft-azure @ git+https://github.com/apache/airflow.git@86fce9688156b242e7df9c31f01ad4dfa84663b6#subdirectory=providers/microsoft/azure" \
     "google-cloud-aiplatform>=1.155.0" \
     "google-genai>=1.0.0"

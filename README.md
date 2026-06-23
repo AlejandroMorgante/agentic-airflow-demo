@@ -4,10 +4,11 @@ Local Apache Airflow demo that sends failed DAG context to an agent runtime, ask
 agent to diagnose the failure, opens a draft GitHub PR with the proposed DAG fix, and
 posts a summary to Slack.
 
-The repo supports two runtime backends:
+The repo supports three runtime backends:
 
 - AWS Bedrock AgentCore Runtime
 - Google Vertex AI Agent Engine
+- Microsoft Azure AI Foundry Agents
 
 ## What Changed
 
@@ -18,10 +19,13 @@ The repo supports two runtime backends:
 - Moved AWS DAGs under `airflow/dags/aws_agentcore/`.
 - Added GCP Agent Engine setup and demo DAGs under
   `airflow/dags/gcp_gemini_agent_platform/`.
+- Added Azure AI Foundry Agents setup and demo DAGs under
+  `airflow/dags/azure_ai_agents/`.
 - Added `scripts/deploy_gcp_agent.sh` to build and push the GCP agent image to
   Artifact Registry.
 - Updated the Airflow image to include the Amazon provider, the Google provider with
-  Vertex AI Agent Engine operators, and the Google Gen AI dependencies.
+  Vertex AI Agent Engine operators, the Microsoft Azure provider with AI Foundry
+  Agents operators, and the Google Gen AI dependencies.
 - Added an Airflow triggerer service for deferrable GCP operators.
 
 ## Can Anyone Run This?
@@ -35,14 +39,21 @@ IAM access, plus Bedrock model access in the target region.
 To run the full GCP path, you need Google Cloud credentials with Vertex AI and
 Artifact Registry access, plus Application Default Credentials available locally.
 
-Both paths need:
+To run the full Azure path, you need an Azure AI Foundry project, a deployed model,
+and an Airflow connection for the Foundry project endpoint.
+
+The AWS and GCP paths need:
 
 - A GitHub token with repository contents and pull request permissions.
 - A Slack incoming webhook.
 - A repository ref that the agent can read and open draft PRs against.
 
+The Azure AI Foundry Agents path exercises the Azure operators by asking a hosted
+agent to analyze the failure context. The operators in this PR do not submit tool
+outputs, so these Azure demos do not open GitHub PRs or post to Slack.
+
 Without those credentials, Airflow can still start locally, but the setup and
-troubleshooting DAGs that call AWS, GCP, GitHub, or Slack will fail.
+troubleshooting DAGs that call AWS, GCP, Azure, GitHub, or Slack will fail.
 
 ## Prerequisites
 
@@ -50,6 +61,7 @@ troubleshooting DAGs that call AWS, GCP, GitHub, or Slack will fail.
 - Python 3.11+
 - AWS CLI, for the AWS AgentCore path
 - Google Cloud CLI, for the GCP Agent Engine path
+- Azure AI Foundry project credentials, for the Azure AI Agents path
 - GitHub PAT with read/write access to this repo
 - Slack incoming webhook
 
@@ -64,6 +76,7 @@ agent/
 airflow/
   dags/aws_agentcore/            AWS setup and failure demo DAGs
   dags/gcp_gemini_agent_platform/ GCP setup and failure demo DAGs
+  dags/azure_ai_agents/          Azure AI Foundry Agents setup and failure demo DAGs
   docker-compose.yml             Local Airflow stack
   Dockerfile                     Airflow image with required providers
 
@@ -133,6 +146,20 @@ AIRFLOW_VAR_GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI=gs://<gcp-project-id>-agent-en
 AIRFLOW_VAR_GCP_AGENT_ENGINE_DISPLAY_NAME=airflow-agent-engine
 AIRFLOW_VAR_GEMINI_MODEL_ID=gemini-2.5-pro
 AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT=google-cloud-platform://?extra__google_cloud_platform__project=<gcp-project-id>&extra__google_cloud_platform__scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform
+```
+
+Azure AI Foundry Agents values:
+
+```bash
+AIRFLOW_VAR_AZURE_AI_AGENTS_MODEL=gpt-4o
+AIRFLOW_VAR_AZURE_AI_AGENT_NAME=airflow-troubleshooting-agent
+AIRFLOW_CONN_AZURE_AI_AGENTS_DEFAULT=azure-ai-agents://<client-id>:<client-secret>@<url-encoded-endpoint>?tenantId=<tenant-id>
+```
+
+The Azure connection endpoint format is:
+
+```text
+https://<aiservices-id>.services.ai.azure.com/api/projects/<project-name>
 ```
 
 For the GCP path, run this on the host so the Airflow container can use ADC through
@@ -262,6 +289,48 @@ Each demo intentionally fails, collects failure context, queries Vertex AI Agent
 Engine, and lets the agent fetch the DAG source from GitHub, create a draft PR, and
 notify Slack.
 
+## Azure AI Foundry Agents Path
+
+Create an Azure AI Foundry project and deploy a model such as `gpt-4o`. Configure
+the `azure_ai_agents_default` Airflow connection with the Foundry project endpoint
+and either client secret credentials or a supported Azure default credential.
+
+Set the model deployment name:
+
+```bash
+AIRFLOW_VAR_AZURE_AI_AGENTS_MODEL=<model-deployment-name>
+AIRFLOW_VAR_AZURE_AI_AGENT_NAME=airflow-troubleshooting-agent
+```
+
+In Airflow, use the Azure setup DAGs:
+
+- `azure_ai_agents_create_agent`
+- `azure_ai_agents_run_agent`
+- `azure_ai_agents_update_agent`
+- `azure_ai_agents_delete_agent`
+- `azure_ai_agents_full_lifecycle`
+
+If you use the standalone create DAG, copy the created agent id into:
+
+```bash
+AIRFLOW_VAR_AZURE_AI_AGENT_ID=<agent-id>
+```
+
+Then restart Airflow.
+
+Azure demo DAGs:
+
+- `azure_ai_agents_demo_failing_etl`
+- `azure_ai_agents_demo_schema_contract_etl`
+- `azure_ai_agents_demo_missing_config_etl`
+- `azure_ai_agents_demo_sql_schema_etl`
+
+Each demo intentionally fails, collects failure context, and runs an Azure AI
+Foundry Agent in deferrable mode until the run reaches a terminal status. These
+demos validate the Azure create/update/run/delete operators. They do not open
+GitHub PRs or post to Slack because `RunAzureAIAgentOperator` does not handle
+agent tool-output submission.
+
 ## Demo Failure Cases
 
 - Bad key lookup: reads `rowz` when the payload contains `rows`.
@@ -302,6 +371,7 @@ Use the delete setup DAGs to remove cloud runtimes:
 
 - `aws_agentcore_delete_runtime`
 - `gcp_agentengine_delete_runtime`
+- `azure_ai_agents_delete_agent`
 
 Stop the local Airflow stack:
 
