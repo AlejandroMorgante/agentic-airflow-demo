@@ -21,11 +21,10 @@ import json
 
 import pendulum
 from airflow.providers.google.cloud.operators.vertex_ai.agent_engine import (
-    CheckQueryAgentEngineOperator,
     CreateAgentEngineOperator,
     DeleteAgentEngineOperator,
     GetAgentEngineOperator,
-    QueryAgentEngineOperator,
+    RunQueryJobOperator,
     UpdateAgentEngineOperator,
 )
 from airflow.sdk import DAG
@@ -104,7 +103,7 @@ QUERY_CONFIG = {
     ),
     "output_gcs_uri": QUERY_OUTPUT_GCS_URI,
 }
-CHECK_QUERY_CONFIG = {"retrieve_result": True}
+CHECK_CONFIG = {"retrieve_result": True}
 
 
 with DAG(
@@ -147,25 +146,17 @@ with DAG(
     default_args=DEFAULT_ARGS,
     tags=["agentic-airflow", "gcp", "setup"],
 ) as query_dag:
-    query_agent_engine = QueryAgentEngineOperator(
-        task_id="query_agent_engine",
+    run_query_job = RunQueryJobOperator(
+        task_id="run_query_job",
         project_id=PROJECT_ID,
         location=LOCATION,
         agent_engine_id=AGENT_ENGINE_ID,
         config=QUERY_CONFIG,
-    )
-    check_query_agent_engine = CheckQueryAgentEngineOperator(
-        task_id="check_query_agent_engine",
-        project_id=PROJECT_ID,
-        location=LOCATION,
-        operation_name="{{ ti.xcom_pull(task_ids='query_agent_engine')['job_name'] }}",
-        config=CHECK_QUERY_CONFIG,
+        check_config=CHECK_CONFIG,
         poll_interval=10,
         timeout=900,
         deferrable=True,
     )
-
-    query_agent_engine >> check_query_agent_engine
 
 
 with DAG(
@@ -199,7 +190,6 @@ with DAG(
         location=LOCATION,
         agent_engine_id=AGENT_ENGINE_ID,
         force=True,
-        deferrable=True,
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
@@ -224,19 +214,13 @@ with DAG(
         location=LOCATION,
         agent_engine_id=CREATED_AGENT_ENGINE_ID,
     )
-    query_agent_engine = QueryAgentEngineOperator(
-        task_id="query_agent_engine",
+    run_query_job = RunQueryJobOperator(
+        task_id="run_query_job",
         project_id=PROJECT_ID,
         location=LOCATION,
         agent_engine_id=CREATED_AGENT_ENGINE_ID,
         config=QUERY_CONFIG,
-    )
-    check_query_agent_engine = CheckQueryAgentEngineOperator(
-        task_id="check_query_agent_engine",
-        project_id=PROJECT_ID,
-        location=LOCATION,
-        operation_name="{{ ti.xcom_pull(task_ids='query_agent_engine')['job_name'] }}",
-        config=CHECK_QUERY_CONFIG,
+        check_config=CHECK_CONFIG,
         poll_interval=10,
         timeout=900,
         deferrable=True,
@@ -254,15 +238,13 @@ with DAG(
         location=LOCATION,
         agent_engine_id=CREATED_AGENT_ENGINE_ID,
         force=True,
-        deferrable=True,
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
     (
         create_agent_engine
         >> get_agent_engine
-        >> query_agent_engine
-        >> check_query_agent_engine
+        >> run_query_job
         >> update_agent_engine
         >> delete_agent_engine
     )
