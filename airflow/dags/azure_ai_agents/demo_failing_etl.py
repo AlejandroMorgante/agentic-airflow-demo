@@ -14,17 +14,14 @@ try:
 except ImportError:
     from airflow.utils.trigger_rule import TriggerRule
 
-
 def fail_transform() -> dict:
     data = {"rows": 100, "source": "demo"}
-    return {"transformed": data["rowz"]}
-
+    return {"transformed": data["rows"]}
 
 def collect_failure_context(**context: Any) -> str:
     return collect_failure_context_payload(
         "azure_ai_agents/demo_failing_etl.py", "transform", **context
     )
-
 
 with DAG(
     dag_id="azure_ai_agents_demo_failing_etl",
