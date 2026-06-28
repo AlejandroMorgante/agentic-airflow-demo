@@ -14,7 +14,9 @@ log = logging.getLogger(__name__)
 
 
 def _deterministic_troubleshoot(dag_id: str, run_id: str) -> dict[str, Any]:
-    use_mocks = os.environ.get("AGENT_USE_MOCKS", "false").lower() in {"1", "true", "yes"}
+    use_mocks = (
+        os.environ.get("AIRFLOW_AGENT_USE_MOCKS") or os.environ.get("AGENT_USE_MOCKS", "false")
+    ).lower() in {"1", "true", "yes"}
     if not use_mocks:
         raise RuntimeError(
             "Deterministic troubleshooting is only valid with AGENT_USE_MOCKS=true. "
@@ -90,4 +92,3 @@ def troubleshoot(payload: dict[str, Any], model_runner: Callable[[str], Any] | N
     prompt = _payload_prompt(payload)
     result = model_runner(prompt)
     return {"summary": str(result)}
-

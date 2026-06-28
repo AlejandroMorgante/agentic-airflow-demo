@@ -11,7 +11,9 @@ log = logging.getLogger(__name__)
 
 
 def _use_mocks() -> bool:
-    return os.environ.get("AGENT_USE_MOCKS", "false").lower() in {"1", "true", "yes"}
+    return (
+        os.environ.get("AIRFLOW_AGENT_USE_MOCKS") or os.environ.get("AGENT_USE_MOCKS", "false")
+    ).lower() in {"1", "true", "yes"}
 
 
 def _mock_slack_message(

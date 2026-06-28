@@ -151,7 +151,8 @@ AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT=google-cloud-platform://?extra__google_cloud_p
 Azure AI Foundry Agents values:
 
 ```bash
-AIRFLOW_VAR_AZURE_AI_AGENTS_MODEL=gpt-4o
+AIRFLOW_VAR_AZURE_AI_AGENTS_MODEL_DEPLOYMENT_NAME=gpt-4o
+AIRFLOW_VAR_AZURE_AI_AGENTS_CONTAINER_IMAGE=<registry>.azurecr.io/airflow-troubleshooting-agent:<tag>
 AIRFLOW_VAR_AZURE_AI_AGENT_NAME=airflow-troubleshooting-agent
 AIRFLOW_CONN_AZURE_AI_AGENTS_DEFAULT=azure-ai-agents://<client-id>:<client-secret>@<url-encoded-endpoint>?tenantId=<tenant-id>
 ```
@@ -295,10 +296,17 @@ Create an Azure AI Foundry project and deploy a model such as `gpt-4o`. Configur
 the `azure_ai_agents_default` Airflow connection with the Foundry project endpoint
 and either client secret credentials or a supported Azure default credential.
 
-Set the model deployment name:
+Build and push the hosted agent container to Azure Container Registry:
 
 ```bash
-AIRFLOW_VAR_AZURE_AI_AGENTS_MODEL=<model-deployment-name>
+AZURE_CONTAINER_REGISTRY_NAME=<registry-name> scripts/deploy_azure_agent.sh
+```
+
+Set the hosted agent image, model deployment name, and agent name:
+
+```bash
+AIRFLOW_VAR_AZURE_AI_AGENTS_CONTAINER_IMAGE=<registry>.azurecr.io/airflow-troubleshooting-agent:<tag>
+AIRFLOW_VAR_AZURE_AI_AGENTS_MODEL_DEPLOYMENT_NAME=<model-deployment-name>
 AIRFLOW_VAR_AZURE_AI_AGENT_NAME=airflow-troubleshooting-agent
 ```
 
@@ -310,13 +318,8 @@ In Airflow, use the Azure setup DAGs:
 - `azure_ai_agents_delete_agent`
 - `azure_ai_agents_full_lifecycle`
 
-If you use the standalone create DAG, copy the created agent id into:
-
-```bash
-AIRFLOW_VAR_AZURE_AI_AGENT_ID=<agent-id>
-```
-
-Then restart Airflow.
+The hosted agent is addressed by `AIRFLOW_VAR_AZURE_AI_AGENT_NAME`; no Azure
+Functions or `AIRFLOW_VAR_AZURE_AI_AGENT_ID` handoff is required.
 
 Azure demo DAGs:
 
@@ -325,11 +328,10 @@ Azure demo DAGs:
 - `azure_ai_agents_demo_missing_config_etl`
 - `azure_ai_agents_demo_sql_schema_etl`
 
-Each demo intentionally fails, collects failure context, and runs an Azure AI
-Foundry Agent in deferrable mode until the run reaches a terminal status. These
-demos validate the Azure create/update/run/delete operators. They do not open
-GitHub PRs or post to Slack because `RunAzureAIAgentOperator` does not handle
-agent tool-output submission.
+Each demo intentionally fails, collects failure context, and invokes the Azure AI
+Foundry Hosted Agent through the `invocations` protocol. The container owns the
+tool loop, so it can fetch DAG source from GitHub, create a draft PR, and notify
+Slack without Azure Functions.
 
 ## Demo Failure Cases
 

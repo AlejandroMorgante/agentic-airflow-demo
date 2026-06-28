@@ -1,0 +1,5 @@
+agent-framework-foundry
+agent-framework-foundry-hosting
+azure-ai-agentserver-invocations
+azure-identity
+python-dotenv
