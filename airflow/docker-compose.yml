@@ -3,7 +3,7 @@ x-airflow-common: &airflow-common
     context: .
     dockerfile: Dockerfile
     args:
-      AIRFLOW_PROVIDER_REF: ${AIRFLOW_PROVIDER_REF:-0ac475f1d8a50657ed80b4ef495e02ab2add8c01}
+      AIRFLOW_PROVIDER_REF: ${AIRFLOW_PROVIDER_REF:-02a7adc531e4987c2049b8a2501672cc6b1e3e4c}
       AZURE_PROVIDER_REF: ${AZURE_PROVIDER_REF:-108ecac75b737b2c7315e2b1093bbc73fe6f4c74}
   env_file:
     - .env

@@ -7,7 +7,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 USER airflow
-ARG AIRFLOW_PROVIDER_REF=2c7240709240b0052e016178e4eb37f4ca01ad82
+ARG AIRFLOW_PROVIDER_REF=02a7adc531e4987c2049b8a2501672cc6b1e3e4c
 ARG AZURE_PROVIDER_REF=108ecac75b737b2c7315e2b1093bbc73fe6f4c74
 RUN pip install --no-cache-dir \
     "apache-airflow-providers-amazon==9.30.0" \
