@@ -8,9 +8,10 @@ RUN apt-get update \
 
 USER airflow
 ARG AIRFLOW_PROVIDER_REF=2c7240709240b0052e016178e4eb37f4ca01ad82
+ARG AZURE_PROVIDER_REF=108ecac75b737b2c7315e2b1093bbc73fe6f4c74
 RUN pip install --no-cache-dir \
     "apache-airflow-providers-amazon==9.30.0" \
     "apache-airflow-providers-google @ git+https://github.com/apache/airflow.git@${AIRFLOW_PROVIDER_REF}#subdirectory=providers/google" \
-    "apache-airflow-providers-microsoft-azure @ git+https://github.com/apache/airflow.git@f3840b91e6d967b2df0dc8f46cc5e6f5702083b4#subdirectory=providers/microsoft/azure" \
+    "apache-airflow-providers-microsoft-azure @ git+https://github.com/apache/airflow.git@${AZURE_PROVIDER_REF}#subdirectory=providers/microsoft/azure" \
     "google-cloud-aiplatform>=1.155.0" \
     "google-genai>=1.0.0"

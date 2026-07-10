@@ -49,7 +49,8 @@ async def _model_response(message: str) -> dict[str, Any]:
     model = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME") or os.environ.get("MODEL_DEPLOYMENT_NAME")
     if not project_endpoint or not model:
         raise RuntimeError(
-            "AGENT_USE_MODEL=true requires AIRFLOW_AGENT_FOUNDRY_PROJECT_ENDPOINT and AZURE_AI_MODEL_DEPLOYMENT_NAME."
+            "AGENT_USE_MODEL=true requires FOUNDRY_PROJECT_ENDPOINT (or "
+            "AIRFLOW_AGENT_FOUNDRY_PROJECT_ENDPOINT) and AZURE_AI_MODEL_DEPLOYMENT_NAME."
         )
 
     instance_client_id = os.environ.get("FOUNDRY_AGENT_INSTANCE_CLIENT_ID")
