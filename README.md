@@ -1,5 +1,7 @@
 # Agentic Airflow PoC
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/a29752c8-03e6-4d03-9bc9-2a25f5d0c27e" />
+
 Local Apache Airflow demo that sends failed DAG context to a BYOC (bring your own
 container) agent runtime, asks the agent to diagnose the failure, opens a draft GitHub
 PR with the proposed DAG fix, and posts a summary to Slack.
