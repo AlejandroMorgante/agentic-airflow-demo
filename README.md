@@ -23,7 +23,7 @@ upstream to Apache Airflow:
 | Cloud | BYOC runtime | Airflow operators exercised | Upstream contribution |
 | --- | --- | --- | --- |
 | AWS | Bedrock AgentCore Runtime | Create, invoke, delete | [apache/airflow#67984](https://github.com/apache/airflow/pull/67984), merged into `main` |
-| Google Cloud | Vertex AI Agent Engine | Create, get, query, update, delete | [apache/airflow#68479](https://github.com/apache/airflow/pull/68479), merged into `main` |
+| Google Cloud | Vertex AI Agent Engine | Create, get, synchronous query, update, delete | [apache/airflow#68479](https://github.com/apache/airflow/pull/68479) and [apache/airflow#70933](https://github.com/apache/airflow/pull/70933), merged into `main` |
 | Microsoft Azure | AI Foundry Hosted Agents | Create, update, run, delete | [apache/airflow#68799](https://github.com/apache/airflow/pull/68799), merged into `main` |
 
 Native operators for Amazon Bedrock AgentCore:
@@ -36,7 +36,7 @@ Native operators for Google Vertex AI Agent Engine:
 
 - `CreateAgentEngineOperator`
 - `GetAgentEngineOperator`
-- `RunQueryJobOperator`
+- `RunReasoningEngineQueryOperator`
 - `UpdateAgentEngineOperator`
 - `DeleteAgentEngineOperator`
 
@@ -67,10 +67,11 @@ Implementation highlights:
   Artifact Registry.
 - Added `scripts/deploy_azure_agent.sh` to build and push the Azure hosted agent
   image to Azure Container Registry.
-- Updated the Airflow image to include the Amazon provider, the Google provider with
-  Vertex AI Agent Engine operators, the Microsoft Azure provider with AI Foundry
-  Agents operators, and the Google Gen AI dependencies.
-- Added an Airflow triggerer service for deferrable GCP operators.
+- Updated the Airflow image to include the Amazon provider, Google provider 22.4.0,
+  the Microsoft Azure provider with AI Foundry Agents operators, and the Google Gen
+  AI dependencies.
+- Switched the GCP self-healing DAGs to the synchronous Vertex AI Agent Engine query
+  operator.
 
 ## Can Anyone Run This?
 
@@ -131,13 +132,11 @@ scripts/
   deploy_azure_agent.sh          Build and push Azure Hosted Agent image to ACR
 ```
 
-The Airflow image uses the released Amazon provider `9.30.0`. Google and Azure are
-installed from explicit commits associated with
-[apache/airflow#68479](https://github.com/apache/airflow/pull/68479) and
-[apache/airflow#68799](https://github.com/apache/airflow/pull/68799), respectively.
-All three operator contributions are now merged into Apache Airflow's `main` branch;
-the Google and Azure commit pins remain explicit for reproducible builds until this
-PoC moves to provider releases that include those operators.
+The Airflow image uses the released Amazon provider `9.30.0` and Google provider
+`22.4.0`. Azure is installed from the explicit commit associated with
+[apache/airflow#68799](https://github.com/apache/airflow/pull/68799). All operator
+contributions are merged into Apache Airflow's `main` branch; the Azure commit pin
+remains explicit until a provider release includes those operators.
 
 ## Security Notes
 
@@ -196,7 +195,6 @@ GCP values:
 AIRFLOW_VAR_GCP_PROJECT_ID=<gcp-project-id>
 AIRFLOW_VAR_GCP_REGION=us-central1
 AIRFLOW_VAR_GCP_AGENT_ENGINE_CONTAINER_URI=<region>-docker.pkg.dev/<project>/<repository>/airflow-troubleshooting-agent:<tag>
-AIRFLOW_VAR_GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI=gs://<gcp-project-id>-agent-engine-query-output/query-output/
 AIRFLOW_VAR_GCP_AGENT_ENGINE_DISPLAY_NAME=airflow-agent-engine
 AIRFLOW_VAR_GEMINI_MODEL_ID=gemini-2.5-pro
 AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT=google-cloud-platform://?extra__google_cloud_platform__project=<gcp-project-id>&extra__google_cloud_platform__scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform
@@ -307,7 +305,6 @@ The script prints the pushed image URI. Put that value in:
 
 ```bash
 AIRFLOW_VAR_GCP_AGENT_ENGINE_CONTAINER_URI=<printed-image-uri>
-AIRFLOW_VAR_GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI=gs://<gcp-project-id>-agent-engine-query-output/query-output/
 ```
 
 Restart Airflow so the env value is loaded:
@@ -342,7 +339,8 @@ GCP demo DAGs:
 
 Each demo intentionally fails, collects failure context, queries Vertex AI Agent
 Engine, and lets the agent fetch the DAG source from GitHub, create a draft PR, and
-notify Slack.
+notify Slack. The query uses `RunReasoningEngineQueryOperator`, so the response is
+returned synchronously without a Google Cloud Storage query-job intermediary.
 
 ## Azure AI Foundry Agents Path
 

@@ -24,7 +24,7 @@ from airflow.providers.google.cloud.operators.vertex_ai.agent_engine import (
     CreateAgentEngineOperator,
     DeleteAgentEngineOperator,
     GetAgentEngineOperator,
-    RunQueryJobOperator,
+    RunReasoningEngineQueryOperator,
     UpdateAgentEngineOperator,
 )
 from airflow.sdk import DAG
@@ -43,10 +43,6 @@ DISPLAY_NAME = (
     "{{ var.value.get('GCP_AGENT_ENGINE_DISPLAY_NAME', 'airflow-agent-engine') }}"
 )
 CONTAINER_URI = "{{ var.value.GCP_AGENT_ENGINE_CONTAINER_URI }}"
-QUERY_OUTPUT_GCS_URI = (
-    "{{ var.value.get('GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI', "
-    "'gs://' ~ var.value.GCP_PROJECT_ID ~ '-agent-engine-query-output/query-output/') }}"
-)
 AGENT_ENGINE_ID = "{{ var.value.GCP_AGENT_ENGINE_NAME.split('/')[-1] }}"
 CREATED_AGENT_ENGINE_ID = (
     "{{ ti.xcom_pull(task_ids='create_agent_engine')['name'].split('/')[-1] }}"
@@ -87,8 +83,8 @@ UPDATE_AGENT_ENGINE_CONFIG = {
     "description": "Updated Airflow system test Agent Engine",
 }
 
-QUERY_CONFIG = {
-    "query": json.dumps(
+QUERY_INPUT = {
+    "input": json.dumps(
         {
             "dag_id": "gcp_agentengine_demo_failing_etl",
             "run_id": "manual__agentengine_smoke",
@@ -100,10 +96,8 @@ QUERY_CONFIG = {
             },
             "log_excerpt": "KeyError: 'rowz'",
         }
-    ),
-    "output_gcs_uri": QUERY_OUTPUT_GCS_URI,
+    )
 }
-CHECK_CONFIG = {"retrieve_result": True}
 
 
 with DAG(
@@ -146,16 +140,13 @@ with DAG(
     default_args=DEFAULT_ARGS,
     tags=["agentic-airflow", "gcp", "setup"],
 ) as query_dag:
-    run_query_job = RunQueryJobOperator(
-        task_id="run_query_job",
+    run_reasoning_engine_query = RunReasoningEngineQueryOperator(
+        task_id="run_reasoning_engine_query",
         project_id=PROJECT_ID,
         location=LOCATION,
-        agent_engine_id=AGENT_ENGINE_ID,
-        config=QUERY_CONFIG,
-        check_config=CHECK_CONFIG,
-        poll_interval=10,
+        reasoning_engine_id=AGENT_ENGINE_ID,
+        input_data=QUERY_INPUT,
         timeout=900,
-        deferrable=True,
     )
 
 
@@ -214,16 +205,13 @@ with DAG(
         location=LOCATION,
         agent_engine_id=CREATED_AGENT_ENGINE_ID,
     )
-    run_query_job = RunQueryJobOperator(
-        task_id="run_query_job",
+    run_reasoning_engine_query = RunReasoningEngineQueryOperator(
+        task_id="run_reasoning_engine_query",
         project_id=PROJECT_ID,
         location=LOCATION,
-        agent_engine_id=CREATED_AGENT_ENGINE_ID,
-        config=QUERY_CONFIG,
-        check_config=CHECK_CONFIG,
-        poll_interval=10,
+        reasoning_engine_id=CREATED_AGENT_ENGINE_ID,
+        input_data=QUERY_INPUT,
         timeout=900,
-        deferrable=True,
     )
     update_agent_engine = UpdateAgentEngineOperator(
         task_id="update_agent_engine",
@@ -244,7 +232,7 @@ with DAG(
     (
         create_agent_engine
         >> get_agent_engine
-        >> run_query_job
+        >> run_reasoning_engine_query
         >> update_agent_engine
         >> delete_agent_engine
     )

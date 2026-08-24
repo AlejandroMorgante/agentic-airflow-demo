@@ -22,7 +22,7 @@ from typing import Any
 import pendulum
 from gcp_gemini_agent_platform._failure_context import collect_failure_context_payload
 from airflow.providers.google.cloud.operators.vertex_ai.agent_engine import (
-    RunQueryJobOperator,
+    RunReasoningEngineQueryOperator,
 )
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
@@ -62,19 +62,15 @@ with DAG(
         trigger_rule=TriggerRule.ONE_FAILED,
     )
 
-    troubleshoot = RunQueryJobOperator(
+    troubleshoot = RunReasoningEngineQueryOperator(
         task_id="troubleshoot_with_agent",
         project_id="{{ var.value.GCP_PROJECT_ID }}",
         location="{{ var.value.get('GCP_REGION', 'us-central1') }}",
-        agent_engine_id="{{ var.value.GCP_AGENT_ENGINE_NAME.split('/')[-1] }}",
-        config={
-            "query": "{{ ti.xcom_pull(task_ids='collect_failure_context') }}",
-            "output_gcs_uri": "{{ var.value.get('GCP_AGENT_ENGINE_QUERY_OUTPUT_GCS_URI', 'gs://' ~ var.value.GCP_PROJECT_ID ~ '-agent-engine-query-output/query-output/') }}",
+        reasoning_engine_id="{{ var.value.GCP_AGENT_ENGINE_NAME.split('/')[-1] }}",
+        input_data={
+            "input": "{{ ti.xcom_pull(task_ids='collect_failure_context') }}",
         },
-        check_config={"retrieve_result": True},
-        poll_interval=10,
         timeout=900,
-        deferrable=True,
     )
 
     extract >> transform >> load

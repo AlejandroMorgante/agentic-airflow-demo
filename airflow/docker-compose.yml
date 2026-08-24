@@ -3,7 +3,6 @@ x-airflow-common: &airflow-common
     context: .
     dockerfile: Dockerfile
     args:
-      AIRFLOW_PROVIDER_REF: ${AIRFLOW_PROVIDER_REF:-02a7adc531e4987c2049b8a2501672cc6b1e3e4c}
       AZURE_PROVIDER_REF: ${AZURE_PROVIDER_REF:-108ecac75b737b2c7315e2b1093bbc73fe6f4c74}
   env_file:
     - .env
@@ -24,6 +23,8 @@ x-airflow-common: &airflow-common
     AWS_PROFILE: ${AWS_PROFILE:-default}
     AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
     AWS_REGION: ${AWS_REGION:-us-east-1}
+    # Suppress the informational gRPC ALTS BIOS probe in local Docker task logs.
+    GRPC_VERBOSITY: ERROR
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
