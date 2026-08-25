@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any, Callable
@@ -25,6 +26,16 @@ USE_MODEL = os.environ.get("AGENT_USE_MODEL", "false").lower() in {"1", "true", 
 MAX_TOOL_ROUNDS = int(os.environ.get("GEMINI_MAX_TOOL_ROUNDS", "8"))
 
 app = LocalInvocationApp()
+
+
+def _normalize_query_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Unwrap the Agent Engine query envelope used by custom containers."""
+    input_value: Any = payload.get("input", payload)
+    if isinstance(input_value, str):
+        input_value = json.loads(input_value)
+    if not isinstance(input_value, dict):
+        raise ValueError("Agent Engine query input must resolve to a JSON object")
+    return input_value
 
 
 def _tool_declarations() -> list[Any]:
@@ -172,7 +183,10 @@ def _run_gemini(prompt: str) -> str:
 
 @app.entrypoint
 def troubleshoot(payload: dict[str, Any]) -> dict[str, Any]:
-    return run_troubleshooting(payload, model_runner=_run_gemini if USE_MODEL else None)
+    return run_troubleshooting(
+        _normalize_query_payload(payload),
+        model_runner=_run_gemini if USE_MODEL else None,
+    )
 
 
 if __name__ == "__main__":

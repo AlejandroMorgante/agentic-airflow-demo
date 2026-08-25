@@ -1,5 +1,6 @@
 import pytest
 
+from gcp_gemini_agent_platform.agent import _normalize_query_payload
 from shared.troubleshooting import troubleshoot
 
 
@@ -21,3 +22,28 @@ def test_deterministic_troubleshoot_rejects_real_data_without_model(monkeypatch)
 
     with pytest.raises(RuntimeError, match="AGENT_USE_MOCKS=true"):
         troubleshoot({"dag_id": "demo_failing_etl", "run_id": "manual__test"})
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"dag_id": "demo_failing_etl", "run_id": "manual__test"},
+        {
+            "input": {
+                "dag_id": "demo_failing_etl",
+                "run_id": "manual__test",
+            }
+        },
+        {
+            "input": (
+                '{"dag_id": "demo_failing_etl", '
+                '"run_id": "manual__test"}'
+            )
+        },
+    ],
+)
+def test_gcp_query_payload_normalization(payload):
+    assert _normalize_query_payload(payload) == {
+        "dag_id": "demo_failing_etl",
+        "run_id": "manual__test",
+    }
