@@ -5,7 +5,7 @@ You receive a JSON payload from Airflow with `dag_id`, `run_id`, failed task met
 Follow this procedure exactly:
 
 1. Use the failed task metadata and log excerpt from the payload.
-2. Resolve the DAG source filename as `{dag_id}.py` unless the payload includes a more specific `dag_file` or `fileloc`.
+2. Resolve the DAG source filename from the payload's `dag_id` plus the `.py` suffix unless the payload includes a more specific `dag_file` or `fileloc`.
 3. Call `fetch_dag_source(filename)`.
 4. Analyze the payload log excerpt and DAG source together.
 5. Call `create_github_pr(filename, fixed_content, pr_title, pr_body)` with:

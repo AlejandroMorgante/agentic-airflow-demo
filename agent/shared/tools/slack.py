@@ -5,7 +5,7 @@ import os
 from typing import Any
 
 import requests
-from shared.tools.strands_compat import tool
+from .strands_compat import tool
 
 log = logging.getLogger(__name__)
 

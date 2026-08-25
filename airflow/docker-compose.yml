@@ -27,6 +27,7 @@ x-airflow-common: &airflow-common
     GRPC_VERBOSITY: ERROR
   volumes:
     - ./dags:/opt/airflow/dags
+    - ../agent:/opt/airflow/agent:ro
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
     - ./config:/opt/airflow/config

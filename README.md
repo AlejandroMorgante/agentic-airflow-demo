@@ -47,9 +47,9 @@ Native operators for Microsoft Azure AI Foundry Hosted Agents:
 - `RunAzureAIAgentOperator`
 - `DeleteAzureAIAgentOperator`
 
-Each path builds a provider-specific agent container, manages its lifecycle with the
-corresponding Airflow provider operators, and runs the same four troubleshooting
-failure cases.
+Each path manages its lifecycle with the corresponding Airflow provider operators
+and runs the same four troubleshooting failure cases. AWS and Azure use hosted
+containers; GCP deploys the ADK agent directly from source.
 
 Implementation highlights:
 
@@ -63,8 +63,8 @@ Implementation highlights:
   `airflow/dags/gcp_gemini_agent_platform/`.
 - Added Azure AI Foundry Agents setup and demo DAGs under
   `airflow/dags/azure_ai_agents/`.
-- Added `scripts/deploy_gcp_agent.sh` to build and push the GCP agent image to
-  Artifact Registry.
+- Migrated the GCP implementation to Google ADK with managed sessions, resource
+  labels, and OpenTelemetry instrumentation.
 - Added `scripts/deploy_azure_agent.sh` to build and push the Azure hosted agent
   image to Azure Container Registry.
 - Updated the Airflow image to include the Amazon provider, Google provider 22.4.0,
@@ -115,7 +115,7 @@ troubleshooting DAGs that call AWS, GCP, Azure, GitHub, or Slack will fail.
 ```text
 agent/
   aws_agentcore/                 AWS runtime entrypoint and requirements
-  gcp_gemini_agent_platform/     GCP runtime entrypoint and requirements
+  gcp_gemini_agent_platform/     Google ADK entrypoint and requirements
   azure_ai_agents/               Azure hosted agent entrypoint and requirements
   shared/                        Shared prompt, troubleshooting flow, and tools
 
@@ -128,7 +128,6 @@ airflow/
 
 scripts/
   deploy_agent.sh                Build and push AWS agent image to ECR
-  deploy_gcp_agent.sh            Build and push GCP agent image to Artifact Registry
   deploy_azure_agent.sh          Build and push Azure Hosted Agent image to ACR
 ```
 
@@ -194,7 +193,6 @@ GCP values:
 ```bash
 AIRFLOW_VAR_GCP_PROJECT_ID=<gcp-project-id>
 AIRFLOW_VAR_GCP_REGION=us-central1
-AIRFLOW_VAR_GCP_AGENT_ENGINE_CONTAINER_URI=<region>-docker.pkg.dev/<project>/<repository>/airflow-troubleshooting-agent:<tag>
 AIRFLOW_VAR_GCP_AGENT_ENGINE_DISPLAY_NAME=airflow-agent-engine
 AIRFLOW_VAR_GEMINI_MODEL_ID=gemini-2.5-pro
 AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT=google-cloud-platform://?extra__google_cloud_platform__project=<gcp-project-id>&extra__google_cloud_platform__scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform
@@ -285,29 +283,11 @@ the agent fetch the DAG source from GitHub, create a draft PR, and notify Slack.
 Make sure the required GCP APIs are enabled for your project:
 
 - Vertex AI API
-- Artifact Registry API
+- Telemetry (OTLP) API
+- Cloud Logging API
 
-Create an Artifact Registry Docker repository if you do not already have one:
-
-```bash
-gcloud artifacts repositories create airflow-agent-platform \
-  --repository-format=docker \
-  --location=us-central1
-```
-
-Build and push the GCP agent image:
-
-```bash
-GCP_PROJECT_ID=<gcp-project-id> scripts/deploy_gcp_agent.sh
-```
-
-The script prints the pushed image URI. Put that value in:
-
-```bash
-AIRFLOW_VAR_GCP_AGENT_ENGINE_CONTAINER_URI=<printed-image-uri>
-```
-
-Restart Airflow so the env value is loaded:
+The GCP setup DAG deploys the Google ADK agent directly from the source mounted in
+the Airflow containers. Restart Airflow after pulling or changing agent code:
 
 ```bash
 docker compose -f airflow/docker-compose.yml up -d
@@ -340,7 +320,9 @@ GCP demo DAGs:
 Each demo intentionally fails, collects failure context, queries Vertex AI Agent
 Engine, and lets the agent fetch the DAG source from GitHub, create a draft PR, and
 notify Slack. The query uses `RunReasoningEngineQueryOperator`, so the response is
-returned synchronously without a Google Cloud Storage query-job intermediary.
+returned synchronously without a Google Cloud Storage query-job intermediary. The
+runtime is labeled as `airflow-self-healing`, uses one managed ADK session per Dag
+run, and emits ADK OpenTelemetry traces, logs, and GenAI semantic attributes.
 
 ## Azure AI Foundry Agents Path
 
@@ -406,17 +388,20 @@ The generated PR is intentionally a draft. It changes the demo typo from
 
 ## Local Agent Behavior
 
-The shared troubleshooting flow has two modes:
+The AWS and Azure troubleshooting implementations have two modes:
 
 - `AGENT_USE_MODEL=true`: calls the selected cloud model/runtime and executes tools.
 - `AGENT_USE_MOCKS=true`: deterministic local mock path used by tests.
 
-Cloud setup DAGs create runtimes with:
+Their cloud setup DAGs create runtimes with:
 
 ```bash
 AGENT_USE_MODEL=true
 AGENT_USE_MOCKS=false
 ```
+
+The GCP runtime uses Google ADK directly and always delegates reasoning and tool
+calling to the configured Gemini model.
 
 ## Development
 

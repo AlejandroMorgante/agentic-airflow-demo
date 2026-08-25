@@ -42,7 +42,6 @@ LOCATION = "{{ var.value.get('GCP_REGION', 'us-central1') }}"
 DISPLAY_NAME = (
     "{{ var.value.get('GCP_AGENT_ENGINE_DISPLAY_NAME', 'airflow-agent-engine') }}"
 )
-CONTAINER_URI = "{{ var.value.GCP_AGENT_ENGINE_CONTAINER_URI }}"
 AGENT_ENGINE_ID = "{{ var.value.GCP_AGENT_ENGINE_NAME.split('/')[-1] }}"
 CREATED_AGENT_ENGINE_ID = (
     "{{ ti.xcom_pull(task_ids='create_agent_engine')['name'].split('/')[-1] }}"
@@ -50,14 +49,26 @@ CREATED_AGENT_ENGINE_ID = (
 
 CREATE_AGENT_ENGINE_CONFIG = {
     "display_name": DISPLAY_NAME,
-    "description": "Airflow system test Agent Engine",
-    "agent_framework": "custom",
+    "description": "Airflow self-healing agent built with Google ADK",
+    "agent_framework": "google-adk",
+    "source_packages": [
+        "agent/__init__.py",
+        "agent/gcp_gemini_agent_platform",
+        "agent/shared",
+    ],
+    "entrypoint_module": "agent.gcp_gemini_agent_platform.agent",
+    "entrypoint_object": "app",
+    "requirements_file": "agent/gcp_gemini_agent_platform/requirements.txt",
+    "labels": {
+        "application": "airflow-self-healing",
+        "environment": "demo",
+        "framework": "google-adk",
+        "managed-by": "airflow",
+    },
     "min_instances": 0,
     "max_instances": 1,
-    "resource_limits": {"cpu": "1", "memory": "1Gi"},
-    "container_spec": {
-        "image_uri": CONTAINER_URI,
-    },
+    "resource_limits": {"cpu": "1", "memory": "4Gi"},
+    "container_concurrency": 3,
     "env_vars": {
         "GCP_PROJECT": PROJECT_ID,
         "GCP_REGION": LOCATION,
@@ -67,13 +78,27 @@ CREATE_AGENT_ENGINE_CONFIG = {
         "GITHUB_DAG_PATH": "{{ var.value.get('GITHUB_DAG_PATH', 'airflow/dags') }}",
         "GITHUB_TOKEN": "{{ var.value.GITHUB_TOKEN }}",
         "SLACK_WEBHOOK_URL": "{{ var.value.SLACK_WEBHOOK_URL }}",
-        "AGENT_USE_MODEL": "true",
         "AGENT_USE_MOCKS": "false",
+        "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
+        "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
+        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "EVENT_ONLY",
     },
     "class_methods": [
         {
             "name": "query",
-            "api_mode": "",
+            "api_mode": "async",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "oneOf": [{"type": "string"}, {"type": "object"}],
+                        "description": "JSON Airflow failure context.",
+                    },
+                    "user_id": {"type": "string", "default": "airflow"},
+                    "session_id": {"type": "string", "nullable": True},
+                },
+                "required": ["message"],
+            },
         },
     ],
 }
@@ -84,7 +109,7 @@ UPDATE_AGENT_ENGINE_CONFIG = {
 }
 
 QUERY_INPUT = {
-    "input": json.dumps(
+    "message": json.dumps(
         {
             "dag_id": "gcp_agentengine_demo_failing_etl",
             "run_id": "manual__agentengine_smoke",
@@ -96,7 +121,8 @@ QUERY_INPUT = {
             },
             "log_excerpt": "KeyError: 'rowz'",
         }
-    )
+    ),
+    "user_id": "airflow",
 }
 
 

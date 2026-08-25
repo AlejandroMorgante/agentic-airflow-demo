@@ -68,7 +68,8 @@ with DAG(
         location="{{ var.value.get('GCP_REGION', 'us-central1') }}",
         reasoning_engine_id="{{ var.value.GCP_AGENT_ENGINE_NAME.split('/')[-1] }}",
         input_data={
-            "input": "{{ ti.xcom_pull(task_ids='collect_failure_context') }}",
+            "message": "{{ ti.xcom_pull(task_ids='collect_failure_context') }}",
+            "user_id": "airflow",
         },
         timeout=900,
     )

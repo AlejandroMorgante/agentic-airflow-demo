@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
-from shared.tools.github_api import create_github_pr, fetch_dag_source
-from shared.tools.slack import post_to_slack
+from .tools.github_api import create_github_pr, fetch_dag_source
+from .tools.slack import post_to_slack
 
 SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "system_prompt.md").read_text()
 log = logging.getLogger(__name__)
