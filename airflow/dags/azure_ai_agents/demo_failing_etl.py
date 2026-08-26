@@ -17,7 +17,7 @@ except ImportError:
 
 def fail_transform() -> dict:
     data = {"rows": 100, "source": "demo"}
-    return {"transformed": data["rowz"]}
+    return {"transformed": data["rows"]}  # Fixed KeyError by correcting the key from 'rowz' to 'rows'.
 
 
 def collect_failure_context(**context: Any) -> str:
