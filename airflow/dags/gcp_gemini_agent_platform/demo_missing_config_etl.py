@@ -28,6 +28,7 @@ from airflow.providers.google.cloud.operators.vertex_ai.agent_engine import (
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.sdk import DAG
+from airflow.models.variable import Variable
 
 try:
     from airflow.sdk import TriggerRule
@@ -36,7 +37,8 @@ except ImportError:
 
 
 def resolve_target_table() -> dict[str, str]:
-    schema = os.environ["WAREHOUSE_SCHEMA"]
+    warehouse_config = Variable.get("warehouse_config", deserialize_json=True)
+    schema = warehouse_config["schema"]
     return {"target_table": f"{schema}.daily_order_summary"}
 
 
